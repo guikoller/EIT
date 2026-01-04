@@ -19,6 +19,19 @@ static lv_obj_t *label_status = NULL;
 static char current_filename[128];
 static ReconstructionResult* recon_result = NULL;
 
+static void recon_return_async_cb(void * user_data)
+{
+    (void)user_data;
+
+    if (recon_result) {
+        lbp_free_result(recon_result);
+        recon_result = NULL;
+    }
+
+    lv_obj_clean(lv_screen_active());
+    sd_file_browser_create();
+}
+
 // Binary file header structure (20 bytes)
 typedef struct {
     uint32_t magic;              // 0x45495442 ('EITB') - 4 bytes
@@ -121,14 +134,8 @@ static void return_btn_clicked(lv_event_t *e)
     
     if(code == LV_EVENT_CLICKED)
     {
-        // Free reconstruction result
-        if (recon_result) {
-            lbp_free_result(recon_result);
-            recon_result = NULL;
-        }
-        
-        lv_obj_clean(lv_screen_active());
-        sd_file_browser_create();
+        /* Don't delete/clean objects inside the event call stack */
+        lv_async_call(recon_return_async_cb, NULL);
     }
 }
 
@@ -145,58 +152,9 @@ static void create_canvas(lv_obj_t *parent)
     lv_canvas_set_buffer(canvas, canvas_buf, DISPLAY_SIZE, DISPLAY_SIZE, LV_COLOR_FORMAT_RGB565);
     
     lv_obj_align(canvas, LV_ALIGN_CENTER, 0, 20);
-    
-    // Fill with dark background initially
-    lv_canvas_fill_bg(canvas, lv_color_hex(0x1a1a1a), LV_OPA_COVER);
-    
-    // Draw circular boundary
-    lv_draw_rect_dsc_t rect_dsc;
-    lv_draw_rect_dsc_init(&rect_dsc);
-    rect_dsc.bg_color = lv_color_hex(0x0a0a0a);
-    rect_dsc.bg_opa = LV_OPA_COVER;
-    rect_dsc.radius = DISPLAY_SIZE / 2;
-    rect_dsc.border_width = 2;
-    rect_dsc.border_color = lv_color_white();
-    
-    lv_area_t area;
-    area.x1 = 0;
-    area.y1 = 0;
-    area.x2 = DISPLAY_SIZE - 1;
-    area.y2 = DISPLAY_SIZE - 1;
-    
-    lv_layer_t layer;
-    lv_canvas_init_layer(canvas, &layer);
-    lv_draw_rect(&layer, &rect_dsc, &area);
-    lv_canvas_finish_layer(canvas, &layer);
-    
-    // Draw electrode dots on circumference
-    int center = DISPLAY_SIZE / 2;
-    int electrode_radius = DISPLAY_SIZE / 2 - 1;
-    
-    for(int i = 0; i < 16; i++)
-    {
-        float angle = (i * 2.0f * 3.14159f) / 16.0f;
-        int x = center + (int)(electrode_radius * cosf(angle));
-        int y = center - (int)(electrode_radius * sinf(angle));
-        
-        // Draw filled circle as electrode marker
-        lv_draw_rect_dsc_t electrode_dsc;
-        lv_draw_rect_dsc_init(&electrode_dsc);
-        electrode_dsc.bg_color = lv_color_white();
-        electrode_dsc.bg_opa = LV_OPA_COVER;
-        electrode_dsc.radius = LV_RADIUS_CIRCLE;
-        electrode_dsc.border_width = 0;
-        
-        lv_area_t dot_area;
-        dot_area.x1 = x - 5;
-        dot_area.y1 = y - 5;
-        dot_area.x2 = x + 5;
-        dot_area.y2 = y + 5;
-        
-        lv_canvas_init_layer(canvas, &layer);
-        lv_draw_rect(&layer, &electrode_dsc, &dot_area);
-        lv_canvas_finish_layer(canvas, &layer);
-    }
+
+    // Fill with black background initially; decorations are drawn after reconstruction
+    lv_canvas_fill_bg(canvas, lv_color_hex(0x000000), LV_OPA_COVER);
 }
 
 /**
@@ -272,58 +230,54 @@ static void render_reconstruction(void)
         return;
     }
     
-    // Get canvas buffer and copy pre-upscaled RGB565 data directly
-    lv_color_t* canvas_buf = (lv_color_t*)lv_canvas_get_buf(canvas);
-    if (canvas_buf) {
-        // Direct memory copy - instant!
-        memcpy(canvas_buf, recon_result->color_buffer, 
-               DISPLAY_SIZE * DISPLAY_SIZE * sizeof(uint16_t));
+    // Copy pre-upscaled RGB565 data directly into canvas buffer
+    lv_color_t * canvas_buf = (lv_color_t *)lv_canvas_get_buf(canvas);
+    if (!canvas_buf) {
+        lv_label_set_text(label_status, "Canvas buffer missing");
+        return;
     }
-    
-    // Redraw circle border and electrode dots on top
-    lv_layer_t layer;
-    lv_canvas_init_layer(canvas, &layer);
-    
-    // Circle border
-    lv_draw_rect_dsc_t circle_dsc;
-    lv_draw_rect_dsc_init(&circle_dsc);
-    circle_dsc.bg_opa = LV_OPA_TRANSP;
-    circle_dsc.radius = DISPLAY_SIZE / 2;
-    circle_dsc.border_width = 2;
-    circle_dsc.border_color = lv_color_white();
-    
-    lv_area_t circle_area;
-    circle_area.x1 = 0;
-    circle_area.y1 = 0;
-    circle_area.x2 = DISPLAY_SIZE - 1;
-    circle_area.y2 = DISPLAY_SIZE - 1;
-    lv_draw_rect(&layer, &circle_dsc, &circle_area);
-    
-    // Electrode dots
+
+    memcpy(canvas_buf, recon_result->color_buffer,
+           DISPLAY_SIZE * DISPLAY_SIZE * sizeof(uint16_t));
+
+    // Draw circle border and electrode dots directly into RGB565 buffer
+    uint16_t * buf16 = (uint16_t *)canvas_buf;
+    uint16_t white_color = 0xFFFF;
     int center = DISPLAY_SIZE / 2;
+    int radius = DISPLAY_SIZE / 2;
+
+    // Circle border (2 pixels wide)
+    for (int angle_deg = 0; angle_deg < 360; angle_deg++) {
+        float angle = angle_deg * 3.14159f / 180.0f;
+        for (int r = radius - 2; r <= radius - 1; r++) {
+            int x = center + (int)(r * cosf(angle));
+            int y = center - (int)(r * sinf(angle));
+            if (x >= 0 && x < DISPLAY_SIZE && y >= 0 && y < DISPLAY_SIZE) {
+                buf16[y * DISPLAY_SIZE + x] = white_color;
+            }
+        }
+    }
+
+    // Electrode dots (filled circles, radius 5)
     int electrode_radius = DISPLAY_SIZE / 2 - 1;
-    
-    for(int i = 0; i < 16; i++) {
+    for (int i = 0; i < 16; i++) {
         float angle = (i * 2.0f * 3.14159f) / 16.0f;
         int ex = center + (int)(electrode_radius * cosf(angle));
         int ey = center - (int)(electrode_radius * sinf(angle));
-        
-        lv_draw_rect_dsc_t dot_dsc;
-        lv_draw_rect_dsc_init(&dot_dsc);
-        dot_dsc.bg_color = lv_color_white();
-        dot_dsc.bg_opa = LV_OPA_COVER;
-        dot_dsc.radius = LV_RADIUS_CIRCLE;
-        dot_dsc.border_width = 0;
-        
-        lv_area_t dot_area;
-        dot_area.x1 = ex - 5;
-        dot_area.y1 = ey - 5;
-        dot_area.x2 = ex + 5;
-        dot_area.y2 = ey + 5;
-        lv_draw_rect(&layer, &dot_dsc, &dot_area);
+
+        for (int dy = -5; dy <= 5; dy++) {
+            for (int dx = -5; dx <= 5; dx++) {
+                if (dx * dx + dy * dy <= 25) {
+                    int px = ex + dx;
+                    int py = ey + dy;
+                    if (px >= 0 && px < DISPLAY_SIZE && py >= 0 && py < DISPLAY_SIZE) {
+                        buf16[py * DISPLAY_SIZE + px] = white_color;
+                    }
+                }
+            }
+        }
     }
-    
-    lv_canvas_finish_layer(canvas, &layer);
+
     lv_obj_invalidate(canvas);
     
     // Update status with range
@@ -403,7 +357,6 @@ void reconstruction_viewer_create(const char *filename)
     
     // Update status
     lv_label_set_text(label_status, "Loading target data...");
-    lv_task_handler();  // Force UI update
     
     // Load target data
     uint16_t tgt_n_meas, tgt_n_inj;
@@ -430,12 +383,10 @@ void reconstruction_viewer_create(const char *filename)
     
     // Update status
     lv_label_set_text(label_status, "Performing reconstruction...");
-    lv_task_handler();
     
     // Initialize LBP if not already done (loads sensitivity matrix)
     if (!lbp_get_matrix_info()) {
         lv_label_set_text(label_status, "Initializing LBP (loading sensitivity matrix)...");
-        lv_task_handler();
         
         if (!lbp_init()) {
             free_uel(ref_uel);

@@ -24,6 +24,16 @@ typedef struct {
 static FileEntry file_entries[MAX_FILES];
 static int file_count = 0;
 
+static char pending_open_filename[64] = "";
+
+static void open_data_viewer_async_cb(void * user_data)
+{
+    (void)user_data;
+
+    if (pending_open_filename[0] == '\0') return;
+    data_viewer_create(pending_open_filename);
+}
+
 /**
  * FatFS get_fattime implementation
  * Returns current time for file timestamps (dummy implementation)
@@ -156,8 +166,10 @@ static void load_btn_clicked(lv_event_t *e)
     {
         if(strlen(selected_filename) > 0)
         {
-            // Open data viewer - it will handle screen cleanup
-            data_viewer_create(selected_filename);
+            /* Don't create/clean screens inside the event call stack */
+            strncpy(pending_open_filename, selected_filename, sizeof(pending_open_filename) - 1);
+            pending_open_filename[sizeof(pending_open_filename) - 1] = '\0';
+            lv_async_call(open_data_viewer_async_cb, NULL);
         }
     }
 }

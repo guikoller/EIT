@@ -37,6 +37,18 @@ static bool uel_populated = false;
 static bool meas_populated = false;
 static char loaded_filename[128];
 
+static void run_async_cb(void * user_data)
+{
+    (void)user_data;
+    reconstruction_viewer_create(loaded_filename);
+}
+
+static void return_async_cb(void * user_data)
+{
+    (void)user_data;
+    data_viewer_destroy();
+}
+
 /**
  * Return button click handler
  */
@@ -46,7 +58,8 @@ static void return_btn_clicked(lv_event_t *e)
     
     if(code == LV_EVENT_CLICKED)
     {
-        data_viewer_destroy();
+        /* Don't delete/clean objects inside the event call stack */
+        lv_async_call(return_async_cb, NULL);
     }
 }
 
@@ -59,7 +72,8 @@ static void run_btn_clicked(lv_event_t *e)
     
     if(code == LV_EVENT_CLICKED)
     {
-        reconstruction_viewer_create(loaded_filename);
+        /* Don't delete/clean objects inside the event call stack */
+        lv_async_call(run_async_cb, NULL);
     }
 }
 

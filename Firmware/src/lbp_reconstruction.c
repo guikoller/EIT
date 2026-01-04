@@ -29,9 +29,11 @@ int lbp_init(void)
     if (initialized) {
         return 1;  // Already initialized
     }
-    
-    // Initialize SDRAM if not already done
-    BSP_SDRAM_Init();
+
+    /* SDRAM is initialized during display/system bring-up (see tft_init).
+     * Re-initializing SDRAM here can disrupt the LCD framebuffer and cause
+     * persistent display corruption.
+     */
     
     // Open sensitivity matrix file
     res = f_open(&file, "0:/sensitivity_matrix.bin", FA_READ);
