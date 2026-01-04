@@ -176,9 +176,9 @@ def plot_reconstruction(image_data, X, el_pos, mask):
 def main():
     # user config
     ref_file = "./data_mat_files/datamat_1_0.mat"
-    tgt_file = "./data_mat_files/datamat_3_3.mat"
+    tgt_file = "./data_mat_files/datamat_4_3.mat"
     n_electrodes = 16
-    image_size = 64
+    image_size = 32
     n_inj_use = None  # None -> use as many injections as available in data
     min_dist = 0.4
 

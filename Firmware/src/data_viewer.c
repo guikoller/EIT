@@ -1,5 +1,6 @@
 #include "data_viewer.h"
 #include "sd_file_browser.h"
+#include "reconstruction_viewer.h"
 #include "ff.h"
 #include <stdio.h>
 #include <string.h>
@@ -34,6 +35,7 @@ static lv_obj_t *table_meas = NULL;
 static bool curr_populated = false;
 static bool uel_populated = false;
 static bool meas_populated = false;
+static char loaded_filename[128];
 
 /**
  * Return button click handler
@@ -57,8 +59,7 @@ static void run_btn_clicked(lv_event_t *e)
     
     if(code == LV_EVENT_CLICKED)
     {
-        // TODO: Implement reconstruction algorithm
-        lv_label_set_text(label_title, "Processing...");
+        reconstruction_viewer_create(loaded_filename);
     }
 }
 
@@ -396,6 +397,10 @@ static void style_table(lv_obj_t *table)
  */
 void data_viewer_create(const char *filename)
 {
+    // Save filename for later use
+    strncpy(loaded_filename, filename, sizeof(loaded_filename) - 1);
+    loaded_filename[sizeof(loaded_filename) - 1] = '\0';
+    
     // Load binary file
     int result = load_binary_file(filename);
     if(result != 0)
