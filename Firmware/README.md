@@ -15,7 +15,8 @@ The [STM32F769 Discovery kit](https://www.st.com/en/evaluation-tools/32f769idisc
 * SAI audio codec
 * Two audio line jacks, one for input and one for output
 * Stereo speaker outputs
-* Four ST MEMS microphones on DFSDM inputs
+* Four ST MEMS microphones
+ on DFSDM inputs
 * Two SPDIF RCA input and output connectors
 * Two push-buttons (user and reset)
 * 512-Mbit Quad-SPI Flash memory
