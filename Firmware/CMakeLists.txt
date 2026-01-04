@@ -85,6 +85,9 @@ add_definitions(
 add_executable(${PROJECT_NAME}
     src/main.c
     src/sd_file_browser.c
+    src/data_viewer.c
+    src/reconstruction_viewer.c
+    src/lbp_reconstruction.c
     src/stm32f7xx_it.c
     src/syscalls.c
     src/system_stm32f7xx.c

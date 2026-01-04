@@ -531,3 +531,29 @@ void data_viewer_destroy(void)
     // Recreate file browser
     sd_file_browser_create();
 }
+
+/**
+ * Get loaded Uel data for reconstruction
+ * Returns pointer to 2D array [n_meas][n_inj]
+ */
+float** data_viewer_get_uel(uint16_t *out_n_meas, uint16_t *out_n_inj)
+{
+    if (!uel_data) {
+        return NULL;
+    }
+    
+    *out_n_meas = n_meas;
+    *out_n_inj = n_inj;
+    
+    // Allocate 2D array pointers
+    float **uel_2d = (float**)malloc(n_meas * sizeof(float*));
+    if (!uel_2d) {
+        return NULL;
+    }
+    
+    for (uint16_t i = 0; i < n_meas; i++) {
+        uel_2d[i] = &uel_data[i * n_inj];
+    }
+    
+    return uel_2d;
+}
