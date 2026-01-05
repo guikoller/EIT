@@ -160,6 +160,15 @@ static int load_binary_file(const char *filename)
             }
         }
     }
+    else
+    {
+        /* New file has no CurrentPattern; clear any previous buffer */
+        if(curr_pattern != NULL)
+        {
+            free(curr_pattern);
+            curr_pattern = NULL;
+        }
+    }
     
     // Allocate and read MeasPattern if present
     if(meas_pattern_rows > 0)
@@ -178,6 +187,15 @@ static int load_binary_file(const char *filename)
                 free(meas_pattern);
                 meas_pattern = NULL;
             }
+        }
+    }
+    else
+    {
+        /* New file has no MeasPattern; clear any previous buffer */
+        if(meas_pattern != NULL)
+        {
+            free(meas_pattern);
+            meas_pattern = NULL;
         }
     }
     
@@ -414,6 +432,13 @@ void data_viewer_create(const char *filename)
     // Save filename for later use
     strncpy(loaded_filename, filename, sizeof(loaded_filename) - 1);
     loaded_filename[sizeof(loaded_filename) - 1] = '\0';
+
+    /* Always reset per-file population state.
+     * If we navigated away via RUN, data_viewer_destroy() wasn't called.
+     */
+    curr_populated = false;
+    uel_populated = false;
+    meas_populated = false;
     
     // Load binary file
     int result = load_binary_file(filename);
