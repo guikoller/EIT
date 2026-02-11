@@ -11,8 +11,51 @@
 #include "diskio.h"		/* Declarations of disk functions */
 #include "stm32f769i_discovery_sd.h"
 
+#include "stm32f7xx.h"
+#include "stm32f7xx_hal.h"
+
+#include <string.h>
+#include <stdint.h>
+
 /* Definitions of physical drive number for each drive */
 #define DEV_SD		0	/* Map SD card to physical drive 0 */
+
+#define SECTOR_SIZE_BYTES 512u
+
+static uint8_t s_sector_bounce[SECTOR_SIZE_BYTES] __attribute__((aligned(32)));
+
+static void dcache_clean_by_addr(const void *addr, uint32_t len)
+{
+	if ((SCB->CCR & (uint32_t)SCB_CCR_DC_Msk) == 0u) {
+		return;
+	}
+
+	uintptr_t start = ((uintptr_t)addr) & ~((uintptr_t)31u);
+	uintptr_t end = ((uintptr_t)addr + (uintptr_t)len + (uintptr_t)31u) & ~((uintptr_t)31u);
+	SCB_CleanDCache_by_Addr((uint32_t *)start, (int32_t)(end - start));
+}
+
+static void dcache_invalidate_by_addr(void *addr, uint32_t len)
+{
+	if ((SCB->CCR & (uint32_t)SCB_CCR_DC_Msk) == 0u) {
+		return;
+	}
+
+	uintptr_t start = ((uintptr_t)addr) & ~((uintptr_t)31u);
+	uintptr_t end = ((uintptr_t)addr + (uintptr_t)len + (uintptr_t)31u) & ~((uintptr_t)31u);
+	SCB_InvalidateDCache_by_Addr((uint32_t *)start, (int32_t)(end - start));
+}
+
+static int sd_wait_ready(uint32_t timeout_ms)
+{
+	uint32_t start = HAL_GetTick();
+	while (BSP_SD_GetCardState() != SD_TRANSFER_OK) {
+		if ((HAL_GetTick() - start) >= timeout_ms) {
+			return 0;
+		}
+	}
+	return 1;
+}
 
 
 /*-----------------------------------------------------------------------*/
@@ -76,11 +119,19 @@ DRESULT disk_read (
 
 	switch (pdrv) {
 	case DEV_SD :
-		if(BSP_SD_ReadBlocks((uint32_t*)buff, (uint32_t)sector, count, 10000) == MSD_OK)
-		{
-			res = RES_OK;
+		if (count == 0) return RES_PARERR;
+
+		for (UINT i = 0; i < count; i++) {
+			if (!sd_wait_ready(1000)) {
+				return RES_ERROR;
+			}
+			if (BSP_SD_ReadBlocks((uint32_t*)s_sector_bounce, (uint32_t)(sector + i), 1, 10000) != MSD_OK) {
+				return RES_ERROR;
+			}
+			dcache_invalidate_by_addr(s_sector_bounce, SECTOR_SIZE_BYTES);
+			memcpy(buff + (i * SECTOR_SIZE_BYTES), s_sector_bounce, SECTOR_SIZE_BYTES);
 		}
-		return res;
+		return RES_OK;
 	}
 
 	return RES_PARERR;
@@ -105,11 +156,19 @@ DRESULT disk_write (
 
 	switch (pdrv) {
 	case DEV_SD :
-		if(BSP_SD_WriteBlocks((uint32_t*)buff, (uint32_t)sector, count, 10000) == MSD_OK)
-		{
-			res = RES_OK;
+		if (count == 0) return RES_PARERR;
+
+		for (UINT i = 0; i < count; i++) {
+			if (!sd_wait_ready(1000)) {
+				return RES_ERROR;
+			}
+			memcpy(s_sector_bounce, buff + (i * SECTOR_SIZE_BYTES), SECTOR_SIZE_BYTES);
+			dcache_clean_by_addr(s_sector_bounce, SECTOR_SIZE_BYTES);
+			if (BSP_SD_WriteBlocks((uint32_t*)s_sector_bounce, (uint32_t)(sector + i), 1, 10000) != MSD_OK) {
+				return RES_ERROR;
+			}
 		}
-		return res;
+		return RES_OK;
 	}
 
 	return RES_PARERR;
@@ -135,7 +194,7 @@ DRESULT disk_ioctl (
 	case DEV_SD :
 		switch (cmd) {
 		case CTRL_SYNC :
-			res = RES_OK;
+			res = sd_wait_ready(1000) ? RES_OK : RES_ERROR;
 			break;
 
 		case GET_SECTOR_COUNT :

@@ -19,6 +19,18 @@ static lv_obj_t *label_status = NULL;
 static char current_filename[128];
 static ReconstructionResult* recon_result = NULL;
 
+static lv_obj_t *btn_save = NULL;
+static lv_timer_t *save_timer = NULL;
+static FIL save_file;
+static char save_path[64];
+static uint32_t save_row = 0;
+static uint32_t save_bytes_written = 0;
+static uint32_t save_bytes_total = 0;
+static FRESULT save_last_res = FR_OK;
+
+static void save_start_async_cb(void * user_data);
+static void save_timer_cb(lv_timer_t * t);
+
 static void recon_return_async_cb(void * user_data)
 {
     (void)user_data;
@@ -136,6 +148,200 @@ static void return_btn_clicked(lv_event_t *e)
     {
         /* Don't delete/clean objects inside the event call stack */
         lv_async_call(recon_return_async_cb, NULL);
+    }
+}
+
+static void save_btn_clicked(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+
+    if(code == LV_EVENT_CLICKED)
+    {
+        if (save_timer != NULL) return;
+        lv_async_call(save_start_async_cb, NULL);
+    }
+}
+
+static int make_unique_bmp_path(char *out, size_t outsz)
+{
+    FILINFO fno;
+    for (uint32_t i = 0; i < 1000; i++) {
+        snprintf(out, outsz, "0:/recon_%03lu.bmp", (unsigned long)i);
+        if (f_stat(out, &fno) != FR_OK) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void write_u16_le(uint8_t *dst, uint16_t v)
+{
+    dst[0] = (uint8_t)(v & 0xFFu);
+    dst[1] = (uint8_t)((v >> 8) & 0xFFu);
+}
+
+static void write_u32_le(uint8_t *dst, uint32_t v)
+{
+    dst[0] = (uint8_t)(v & 0xFFu);
+    dst[1] = (uint8_t)((v >> 8) & 0xFFu);
+    dst[2] = (uint8_t)((v >> 16) & 0xFFu);
+    dst[3] = (uint8_t)((v >> 24) & 0xFFu);
+}
+
+static void write_i32_le(uint8_t *dst, int32_t v)
+{
+    write_u32_le(dst, (uint32_t)v);
+}
+
+static void save_start_async_cb(void * user_data)
+{
+    (void)user_data;
+
+    lv_color_t *canvas_buf = canvas ? (lv_color_t *)lv_canvas_get_buf(canvas) : NULL;
+    if (!canvas_buf) {
+        lv_label_set_text(label_status, "SAVE ERROR: canvas missing");
+        return;
+    }
+
+    if (!make_unique_bmp_path(save_path, sizeof(save_path))) {
+        lv_label_set_text(label_status, "SAVE ERROR: name" );
+        return;
+    }
+
+    save_last_res = f_open(&save_file, save_path, FA_CREATE_ALWAYS | FA_WRITE);
+    if (save_last_res != FR_OK) {
+        char err[64];
+        snprintf(err, sizeof(err), "SAVE OPEN ERR r%u", (unsigned)save_last_res);
+        lv_label_set_text(label_status, err);
+        return;
+    }
+
+    /* 24-bit BMP header (54 bytes). Use negative height for top-down rows. */
+    const uint32_t width = DISPLAY_SIZE;
+    const uint32_t height = DISPLAY_SIZE;
+    const uint32_t row_bytes = width * 3u;
+    const uint32_t pixel_bytes = row_bytes * height;
+    const uint32_t file_size = 54u + pixel_bytes;
+
+    uint8_t hdr[54];
+    memset(hdr, 0, sizeof(hdr));
+
+    hdr[0] = 'B';
+    hdr[1] = 'M';
+    write_u32_le(&hdr[2], file_size);
+    write_u32_le(&hdr[10], 54u);
+
+    write_u32_le(&hdr[14], 40u);
+    write_i32_le(&hdr[18], (int32_t)width);
+    write_i32_le(&hdr[22], -(int32_t)height);
+    write_u16_le(&hdr[26], 1u);
+    write_u16_le(&hdr[28], 24u);
+    write_u32_le(&hdr[34], pixel_bytes);
+
+    UINT bw = 0;
+    save_last_res = f_write(&save_file, hdr, sizeof(hdr), &bw);
+    if (save_last_res != FR_OK || bw != sizeof(hdr)) {
+        f_close(&save_file);
+        char err[64];
+        snprintf(err, sizeof(err), "SAVE HDR ERR r%u", (unsigned)save_last_res);
+        lv_label_set_text(label_status, err);
+        return;
+    }
+
+    save_row = 0;
+    save_bytes_written = sizeof(hdr);
+    save_bytes_total = file_size;
+
+    if (btn_save) lv_obj_add_state(btn_save, LV_STATE_DISABLED);
+    lv_label_set_text(label_status, "Saving 0%...");
+    save_timer = lv_timer_create(save_timer_cb, 10, NULL);
+}
+
+static void save_timer_cb(lv_timer_t * t)
+{
+    (void)t;
+
+    const uint16_t *src_buf = NULL;
+    if (recon_result && recon_result->success && recon_result->color_buffer) {
+        src_buf = recon_result->color_buffer; /* raw reconstruction (no overlay) */
+    } else if (canvas) {
+        src_buf = (const uint16_t *)lv_canvas_get_buf(canvas);
+    }
+
+    if (!src_buf) {
+        if (save_timer) {
+            lv_timer_del(save_timer);
+            save_timer = NULL;
+        }
+        f_close(&save_file);
+        if (btn_save) lv_obj_clear_state(btn_save, LV_STATE_DISABLED);
+        lv_label_set_text(label_status, "SAVE ERROR: canvas" );
+        return;
+    }
+
+    static uint8_t rowbuf[DISPLAY_SIZE * 3u];
+    const uint32_t width = DISPLAY_SIZE;
+    const uint32_t height = DISPLAY_SIZE;
+    const uint32_t rows_per_tick = 2;
+
+    for (uint32_t r = 0; r < rows_per_tick && save_row < height; r++) {
+        const uint16_t *src = src_buf + (save_row * width);
+        uint8_t *dst = rowbuf;
+
+        for (uint32_t x = 0; x < width; x++) {
+            uint16_t p = src[x];
+            uint8_t r5 = (uint8_t)((p >> 11) & 0x1Fu);
+            uint8_t g6 = (uint8_t)((p >> 5) & 0x3Fu);
+            uint8_t b5 = (uint8_t)(p & 0x1Fu);
+
+            uint8_t rr = (uint8_t)((r5 << 3) | (r5 >> 2));
+            uint8_t gg = (uint8_t)((g6 << 2) | (g6 >> 4));
+            uint8_t bb = (uint8_t)((b5 << 3) | (b5 >> 2));
+
+            /* BMP uses B, G, R */
+            *dst++ = bb;
+            *dst++ = gg;
+            *dst++ = rr;
+        }
+
+        UINT bw = 0;
+        save_last_res = f_write(&save_file, rowbuf, (UINT)(width * 3u), &bw);
+        if (save_last_res != FR_OK || bw != (UINT)(width * 3u)) {
+            if (save_timer) {
+                lv_timer_del(save_timer);
+                save_timer = NULL;
+            }
+            f_close(&save_file);
+            if (btn_save) lv_obj_clear_state(btn_save, LV_STATE_DISABLED);
+            char err[64];
+            snprintf(err, sizeof(err), "SAVE DATA ERR r%u", (unsigned)save_last_res);
+            lv_label_set_text(label_status, err);
+            return;
+        }
+
+        save_bytes_written += bw;
+        save_row++;
+    }
+
+    uint32_t pct = (save_bytes_total > 0) ? (save_bytes_written * 100u) / save_bytes_total : 0;
+    if (pct > 100u) pct = 100u;
+    char st[64];
+    snprintf(st, sizeof(st), "Saving %lu%%...", (unsigned long)pct);
+    lv_label_set_text(label_status, st);
+
+    if (save_row >= height) {
+        f_close(&save_file);
+        if (save_timer) {
+            lv_timer_del(save_timer);
+            save_timer = NULL;
+        }
+        if (btn_save) lv_obj_clear_state(btn_save, LV_STATE_DISABLED);
+
+        char done[96];
+        const char *fn = save_path;
+        if (strncmp(save_path, "0:/", 3) == 0) fn = &save_path[3];
+        snprintf(done, sizeof(done), "Saved %s", fn);
+        lv_label_set_text(label_status, done);
     }
 }
 
@@ -345,6 +551,19 @@ void reconstruction_viewer_create(const char *filename)
     lv_label_set_text(label_return, LV_SYMBOL_LEFT " RETURN TO MENU");
     lv_obj_set_style_text_color(label_return, lv_color_white(), 0);
     lv_obj_center(label_return);
+
+    // Save button
+    btn_save = lv_button_create(recon_screen);
+    lv_obj_set_size(btn_save, 180, 50);
+    lv_obj_align(btn_save, LV_ALIGN_BOTTOM_RIGHT, -20, -20);
+    lv_obj_set_style_bg_color(btn_save, lv_color_hex(0x2a7da8), 0);
+    lv_obj_set_style_radius(btn_save, 5, 0);
+    lv_obj_add_event_cb(btn_save, save_btn_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *label_save = lv_label_create(btn_save);
+    lv_label_set_text(label_save, "SAVE IMAGE");
+    lv_obj_set_style_text_color(label_save, lv_color_white(), 0);
+    lv_obj_center(label_save);
     
     // Load reference data (datamat_1_0.bin)
     uint16_t ref_n_meas, ref_n_inj;
@@ -425,6 +644,11 @@ void reconstruction_viewer_create(const char *filename)
  */
 void reconstruction_viewer_destroy(void)
 {
+    if (save_timer) {
+        lv_timer_del(save_timer);
+        save_timer = NULL;
+    }
+
     // Free reconstruction result
     if (recon_result) {
         lbp_free_result(recon_result);
