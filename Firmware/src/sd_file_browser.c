@@ -1,5 +1,6 @@
 #include "sd_file_browser.h"
 #include "data_viewer.h"
+#include "calibration.h"
 #include "stm32f769i_discovery_sd.h"
 #include "ff.h"
 #include <string.h>
@@ -7,11 +8,31 @@
 
 static lv_obj_t *file_list;
 static lv_obj_t *btn_load;
+static lv_obj_t *btn_calibrate;
 static lv_obj_t *label_title;
+static lv_obj_t *label_status;
 static lv_obj_t *selected_file_obj = NULL;
 static char selected_filename[64] = "";
 static FATFS SDFatFs;
 static uint8_t fs_mounted = 0;
+
+static lv_timer_t *calib_timer = NULL;
+static uint8_t calib_start_pending = 0;
+
+static const char *calib_stage_text(calib_stage_t st)
+{
+    switch (st) {
+        case CALIB_STAGE_OPEN_DATASET: return "OPENING";
+        case CALIB_STAGE_READ_HEADER: return "READING";
+        case CALIB_STAGE_READ_PATTERNS: return "PATTERNS";
+        case CALIB_STAGE_PRECOMPUTE_FIELDS: return "GENERATING";
+        case CALIB_STAGE_OPEN_OUTPUT: return "OPEN OUT";
+        case CALIB_STAGE_WRITE_HEADER: return "WRITE HDR";
+        case CALIB_STAGE_WRITE_DATA: return "WRITING";
+        case CALIB_STAGE_CLOSE_FILE: return "CLOSING";
+        default: return "";
+    }
+}
 
 #define MAX_FILES 50
 
@@ -174,6 +195,86 @@ static void load_btn_clicked(lv_event_t *e)
     }
 }
 
+static void set_ui_enabled(bool enabled)
+{
+    if (enabled) {
+        lv_obj_clear_state(btn_load, LV_STATE_DISABLED);
+        lv_obj_clear_state(btn_calibrate, LV_STATE_DISABLED);
+    } else {
+        lv_obj_add_state(btn_load, LV_STATE_DISABLED);
+        lv_obj_add_state(btn_calibrate, LV_STATE_DISABLED);
+    }
+}
+
+static void calib_timer_cb(lv_timer_t *t)
+{
+    (void)t;
+
+    calib_progress_t prog;
+    calib_status_t st = calibration_step(&prog);
+
+    if (st == CALIB_STATUS_RUNNING) {
+        uint32_t pct = 0;
+        if (prog.bytes_total > 0) {
+            pct = (uint32_t)((prog.bytes_written * 100u) / prog.bytes_total);
+            if (pct > 100u) pct = 100u;
+        }
+        lv_label_set_text_fmt(label_status, "CAL %s %lu%%", calib_stage_text(prog.stage), (unsigned long)pct);
+        return;
+    }
+
+    if (calib_timer) {
+        lv_timer_del(calib_timer);
+        calib_timer = NULL;
+    }
+
+    set_ui_enabled(true);
+
+    if (st == CALIB_STATUS_DONE) {
+        lv_label_set_text(label_status, "CAL DONE");
+    } else {
+        lv_label_set_text_fmt(label_status, "CAL ERR %s (r%u)", calib_stage_text(calibration_last_stage()), (unsigned)calibration_last_fresult());
+    }
+}
+
+static void calibrate_start_async_cb(void *user_data)
+{
+    (void)user_data;
+
+    if (!calib_start_pending) return;
+    calib_start_pending = 0;
+
+    const char *dataset = "datamat_1_0.bin";
+
+    if (!calibration_begin_from_dataset(dataset, "sensitivity_matrix.bin")) {
+        set_ui_enabled(true);
+        lv_label_set_text_fmt(label_status, "CAL ERR %s (r%u)", calib_stage_text(calibration_last_stage()), (unsigned)calibration_last_fresult());
+        return;
+    }
+
+    lv_label_set_text(label_status, "CAL WRITING...");
+
+    if (calib_timer) {
+        lv_timer_del(calib_timer);
+        calib_timer = NULL;
+    }
+    calib_timer = lv_timer_create(calib_timer_cb, 25, NULL);
+}
+
+static void calibrate_btn_clicked(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code != LV_EVENT_CLICKED) return;
+
+    if (calib_timer || calib_start_pending) return;
+
+    lv_label_set_text(label_status, "CAL GENERATING...");
+    set_ui_enabled(false);
+
+    calib_start_pending = 1;
+    lv_async_call(calibrate_start_async_cb, NULL);
+}
+
 /**
  * Format file size to human readable
  */
@@ -281,6 +382,26 @@ void sd_file_browser_create(void)
     // Scan and populate files
     scan_files();
     populate_file_list();
+
+    // Status label
+    label_status = lv_label_create(cont);
+    lv_label_set_text(label_status, "READY");
+    lv_obj_set_style_text_color(label_status, lv_color_white(), 0);
+    lv_obj_set_style_text_font(label_status, &lv_font_montserrat_22, 0);
+    lv_obj_align(label_status, LV_ALIGN_BOTTOM_MID, 0, -80);
+
+    // Calibrate button
+    btn_calibrate = lv_button_create(cont);
+    lv_obj_set_size(btn_calibrate, 180, 50);
+    lv_obj_align(btn_calibrate, LV_ALIGN_BOTTOM_LEFT, 25, -20);
+    lv_obj_set_style_bg_color(btn_calibrate, lv_color_hex(0x2a7da8), 0);
+    lv_obj_set_style_radius(btn_calibrate, 5, 0);
+    lv_obj_add_event_cb(btn_calibrate, calibrate_btn_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *btn_cal_label = lv_label_create(btn_calibrate);
+    lv_label_set_text(btn_cal_label, "CALIBRATE");
+    lv_obj_set_style_text_color(btn_cal_label, lv_color_white(), 0);
+    lv_obj_center(btn_cal_label);
     
     // Load button
     btn_load = lv_button_create(cont);
@@ -294,4 +415,6 @@ void sd_file_browser_create(void)
     lv_label_set_text(btn_label, "LOAD DATASET");
     lv_obj_set_style_text_color(btn_label, lv_color_white(), 0);
     lv_obj_center(btn_label);
+
+    set_ui_enabled(true);
 }

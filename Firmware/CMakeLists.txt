@@ -86,6 +86,7 @@ add_executable(${PROJECT_NAME}
     src/main.c
     src/sd_file_browser.c
     src/data_viewer.c
+    src/calibration.c
     src/reconstruction_viewer.c
     src/lbp_reconstruction.c
     src/stm32f7xx_it.c
