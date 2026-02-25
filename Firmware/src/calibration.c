@@ -1,5 +1,7 @@
 #include "calibration.h"
 
+#include "dataset_format.h"
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,18 +29,6 @@ typedef struct {
 } SensitivityMatrixHeader;
 
 _Static_assert(sizeof(SensitivityMatrixHeader) == 32, "SensitivityMatrixHeader must be 32 bytes");
-
-/* Matches data_viewer.c dataset header (20 bytes) */
-typedef struct {
-    uint32_t magic;              /* 'EITB' */
-    uint16_t n_meas;
-    uint16_t n_inj;
-    uint16_t image_size;
-    uint16_t curr_pattern_rows;
-    uint16_t meas_pattern_rows;
-    uint16_t reserved;
-    uint32_t reserved2;
-} __attribute__((packed)) BinFileHeader;
 
 static FIL s_out;
 static calib_status_t s_status = CALIB_STATUS_IDLE;
@@ -239,7 +229,7 @@ int calibration_begin_from_dataset(const char *dataset_filename, const char *out
         return 0;
     }
 
-    if (hdr.magic != 0x45495442u) {
+    if (hdr.magic != DATASET_MAGIC_EITB) {
         f_close(&ds);
         fail(CALIB_STAGE_READ_HEADER, FR_INVALID_OBJECT);
         return 0;

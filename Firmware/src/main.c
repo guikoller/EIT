@@ -12,12 +12,9 @@
 #include "stm32f7xx.h"
 #include "stm32f769i_discovery.h"
 #include "stm32f769i_discovery_sd.h"
-#include "hal_stm_lvgl/tft/tft.h"
-#include "hal_stm_lvgl/touchpad/touchpad.h"
-#include "lvgl/lvgl.h"
+#include "app_coordinator.h"
 #include "lvgl/examples/lv_examples.h"
 #include "lvgl/demos/lv_demos.h"
-#include "sd_file_browser.h"
 
 static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
@@ -42,23 +39,10 @@ int main(void) {
 
 	SystemClock_Config();
 
-	/* Initialize SD Card */
-	if(sd_card_init() != 0)
-	{
-		/* SD card initialization failed - continue anyway */
-		/* Error will be displayed in the UI */
-	}
-
-	lv_init();
-
-	tft_init();
-	touchpad_init();
-
-	/* Create SD card browser UI instead of demo */
-	sd_file_browser_create();
+  app_coordinator_init();
 
 	while(1) {
-	    lv_task_handler();
+      app_coordinator_tick();
 		HAL_Delay(1);
 	}
 }

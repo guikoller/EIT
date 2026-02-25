@@ -84,10 +84,20 @@ add_definitions(
 # list of modules to build final firmware (without extension .c or .cpp)
 add_executable(${PROJECT_NAME}
     src/main.c
+    src/app_coordinator.c
+    src/app_fsm.c
+    src/storage_service.c
+    src/dataset_service.c
     src/sd_file_browser.c
+    src/sd_file_browser_view.c
+    src/sd_file_browser_presenter.c
     src/data_viewer.c
+    src/data_viewer_view.c
+    src/data_viewer_presenter.c
     src/calibration.c
     src/reconstruction_viewer.c
+    src/reconstruction_viewer_view.c
+    src/reconstruction_viewer_presenter.c
     src/lbp_reconstruction.c
     src/stm32f7xx_it.c
     src/syscalls.c
