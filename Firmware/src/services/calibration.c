@@ -347,6 +347,11 @@ int calibration_begin_from_dataset(const char *dataset_filename, const char *out
     return 1;
 }
 
+int sensitivity_matrix_begin_from_dataset(const char *dataset_filename, const char *output_filename)
+{
+    return calibration_begin_from_dataset(dataset_filename, output_filename);
+}
+
 calib_status_t calibration_step(calib_progress_t *out)
 {
     if (out) {
@@ -404,6 +409,11 @@ calib_status_t calibration_step(calib_progress_t *out)
     return s_status;
 }
 
+calib_status_t sensitivity_matrix_step(calib_progress_t *out)
+{
+    return calibration_step(out);
+}
+
 void calibration_cancel(void)
 {
     if (s_status == CALIB_STATUS_RUNNING) {
@@ -413,12 +423,27 @@ void calibration_cancel(void)
     reset_state();
 }
 
+void sensitivity_matrix_cancel(void)
+{
+    calibration_cancel();
+}
+
 FRESULT calibration_last_fresult(void)
 {
     return s_last_res;
 }
 
+FRESULT sensitivity_matrix_last_fresult(void)
+{
+    return calibration_last_fresult();
+}
+
 calib_stage_t calibration_last_stage(void)
 {
     return s_stage;
+}
+
+calib_stage_t sensitivity_matrix_last_stage(void)
+{
+    return calibration_last_stage();
 }

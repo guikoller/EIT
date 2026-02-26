@@ -17,7 +17,7 @@ void sd_file_browser_create(void)
 
     bindings.ctx = &s_presenter;
     bindings.on_load = sd_file_browser_presenter_on_load;
-    bindings.on_calibrate = sd_file_browser_presenter_on_calibrate;
+    bindings.on_compute_sens_matrix = sd_file_browser_presenter_on_compute_sens_matrix;
 
     sd_file_browser_view_create(&s_view, lv_screen_active(), &bindings);
     sd_file_browser_presenter_on_create(&s_presenter);

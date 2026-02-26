@@ -3,7 +3,7 @@
 
 #include "reconstruction_viewer_view.h"
 
-#include "lbp_reconstruction.h"
+#include "algorithms/lbp_reconstruction.h"
 
 #include "ff.h"
 

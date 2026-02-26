@@ -19,19 +19,19 @@ typedef struct {
 } sd_browser_file_entry_t;
 
 typedef void (*sd_browser_on_load_cb_t)(void *ctx, const char *filename);
-typedef void (*sd_browser_on_calibrate_cb_t)(void *ctx);
+typedef void (*sd_browser_on_compute_sens_matrix_cb_t)(void *ctx);
 
 typedef struct {
     void *ctx;
     sd_browser_on_load_cb_t on_load;
-    sd_browser_on_calibrate_cb_t on_calibrate;
+    sd_browser_on_compute_sens_matrix_cb_t on_compute_sens_matrix;
 } sd_file_browser_view_bindings_t;
 
 typedef struct {
     lv_obj_t *cont;
     lv_obj_t *file_list;
     lv_obj_t *btn_load;
-    lv_obj_t *btn_calibrate;
+    lv_obj_t *btn_compute_sens_matrix;
     lv_obj_t *label_title;
     lv_obj_t *label_status;
 

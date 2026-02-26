@@ -12,7 +12,7 @@
 #include "stm32f7xx.h"
 #include "stm32f769i_discovery.h"
 #include "stm32f769i_discovery_sd.h"
-#include "app_coordinator.h"
+#include "app/app_coordinator.h"
 #include "lvgl/examples/lv_examples.h"
 #include "lvgl/demos/lv_demos.h"
 

@@ -8,7 +8,7 @@ The [STM32F769 Discovery kit](https://www.st.com/en/evaluation-tools/32f769idisc
 * Five power supply options:
 * ST LINK/V2-1
 * USB HS connector
-* 5 V from RJ45 (Power Over Ethernet)
+* 5 V from RJ45 (Power Over Ethernet)SENS
 * 5 V from Arduino™ or external connector
 * USB charger
 * 4-inch capacitive touch LCD display with MIPI-DSI connector

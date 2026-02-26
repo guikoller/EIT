@@ -1,13 +1,13 @@
 #include "app_coordinator.h"
 
 #include "app_fsm.h"
-#include "data_viewer.h"
-#include "storage_service.h"
+#include "screens/data_viewer/data_viewer.h"
+#include "services/storage_service.h"
 #include "hal_stm_lvgl/tft/tft.h"
 #include "hal_stm_lvgl/touchpad/touchpad.h"
 #include "lvgl/lvgl.h"
-#include "reconstruction_viewer.h"
-#include "sd_file_browser.h"
+#include "screens/reconstruction/reconstruction_viewer.h"
+#include "screens/browser/sd_file_browser.h"
 
 static app_state_t s_app;
 

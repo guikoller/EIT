@@ -38,19 +38,27 @@ typedef struct {
     FRESULT fresult;
 } calib_progress_t;
 
-/* Starts calibration using patterns from dataset_filename (e.g. "datamat_1_0.bin")
- * and writes output_filename (e.g. "sensitivity_matrix.bin") at the SD root.
+/* Computes (generates) the sensitivity matrix using patterns from dataset_filename
+ * (e.g. "datamat_1_0.bin") and writes output_filename (e.g. "sensitivity_matrix.bin")
+ * at the SD root.
  * Returns 1 on success (started), 0 on failure.
  */
-int calibration_begin_from_dataset(const char *dataset_filename, const char *output_filename);
+int sensitivity_matrix_begin_from_dataset(const char *dataset_filename, const char *output_filename);
 
 /* Performs a small amount of work and returns current status.
  * Call periodically from an LVGL timer.
  */
+calib_status_t sensitivity_matrix_step(calib_progress_t *out);
+
+void sensitivity_matrix_cancel(void);
+
+FRESULT sensitivity_matrix_last_fresult(void);
+calib_stage_t sensitivity_matrix_last_stage(void);
+
+/* Backward-compatible API (older code used "calibration" wording). */
+int calibration_begin_from_dataset(const char *dataset_filename, const char *output_filename);
 calib_status_t calibration_step(calib_progress_t *out);
-
 void calibration_cancel(void);
-
 FRESULT calibration_last_fresult(void);
 calib_stage_t calibration_last_stage(void);
 

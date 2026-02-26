@@ -1,8 +1,8 @@
 #include "sd_file_browser_presenter.h"
 
-#include "app_coordinator.h"
-#include "calibration.h"
-#include "storage_service.h"
+#include "app/app_coordinator.h"
+#include "services/calibration.h"
+#include "services/storage_service.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -35,7 +35,7 @@ static void calib_timer_cb(lv_timer_t *t)
     }
 
     calib_progress_t prog;
-    calib_status_t st = calibration_step(&prog);
+    calib_status_t st = sensitivity_matrix_step(&prog);
 
     if (st == CALIB_STATUS_RUNNING) {
         uint32_t pct = 0;
@@ -44,17 +44,17 @@ static void calib_timer_cb(lv_timer_t *t)
         }
 
         char msg[64];
-        snprintf(msg, sizeof(msg), "CAL %s %lu%%", calib_stage_text(prog.stage), (unsigned long)pct);
+        snprintf(msg, sizeof(msg), "SENS %s %lu%%", calib_stage_text(prog.stage), (unsigned long)pct);
         sd_file_browser_view_set_status(p->view, msg);
         return;
     }
 
     if (st == CALIB_STATUS_DONE) {
-        sd_file_browser_view_set_status(p->view, "CAL DONE");
+        sd_file_browser_view_set_status(p->view, "SENS DONE");
         sd_file_browser_view_set_enabled(p->view, 1);
     } else {
         char msg[64];
-        snprintf(msg, sizeof(msg), "CAL ERR %s (r%u)", calib_stage_text(prog.stage), (unsigned)prog.fresult);
+        snprintf(msg, sizeof(msg), "SENS ERR %s (r%u)", calib_stage_text(prog.stage), (unsigned)prog.fresult);
         sd_file_browser_view_set_status(p->view, msg);
         sd_file_browser_view_set_enabled(p->view, 1);
     }
@@ -65,7 +65,7 @@ static void calib_timer_cb(lv_timer_t *t)
     }
 }
 
-static void calibrate_start_async_cb(void *user_data)
+static void compute_sens_matrix_start_async_cb(void *user_data)
 {
     sd_file_browser_presenter_t *p = (sd_file_browser_presenter_t *)user_data;
     if (!p || !p->view) return;
@@ -77,13 +77,13 @@ static void calibrate_start_async_cb(void *user_data)
     p->calib_start_pending = 0u;
 
     if (!storage_service_is_mounted()) {
-        sd_file_browser_view_set_status(p->view, "CAL ERR NO SD");
+        sd_file_browser_view_set_status(p->view, "SENS ERR NO SD");
         sd_file_browser_view_set_enabled(p->view, 1);
         return;
     }
 
-    if (!calibration_begin_from_dataset("datamat_1_0.bin", "sensitivity_matrix.bin")) {
-        sd_file_browser_view_set_status(p->view, "CAL ERR START");
+    if (!sensitivity_matrix_begin_from_dataset("datamat_1_0.bin", "sensitivity_matrix.bin")) {
+        sd_file_browser_view_set_status(p->view, "SENS ERR START");
         sd_file_browser_view_set_enabled(p->view, 1);
         return;
     }
@@ -148,16 +148,16 @@ void sd_file_browser_presenter_on_load(void *ctx, const char *filename)
     app_coordinator_post_event(&evt);
 }
 
-void sd_file_browser_presenter_on_calibrate(void *ctx)
+void sd_file_browser_presenter_on_compute_sens_matrix(void *ctx)
 {
     sd_file_browser_presenter_t *p = (sd_file_browser_presenter_t *)ctx;
     if (!p || !p->view) return;
 
     if (p->calib_timer || p->calib_start_pending) return;
 
-    sd_file_browser_view_set_status(p->view, "CAL GENERATING...");
+    sd_file_browser_view_set_status(p->view, "SENS GENERATING...");
     sd_file_browser_view_set_enabled(p->view, 0);
 
     p->calib_start_pending = 1u;
-    lv_async_call(calibrate_start_async_cb, p);
+    lv_async_call(compute_sens_matrix_start_async_cb, p);
 }

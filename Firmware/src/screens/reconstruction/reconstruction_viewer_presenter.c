@@ -1,7 +1,7 @@
 #include "reconstruction_viewer_presenter.h"
 
-#include "app_coordinator.h"
-#include "dataset_service.h"
+#include "app/app_coordinator.h"
+#include "services/dataset_service.h"
 
 #include <string.h>
 #include <stdio.h>

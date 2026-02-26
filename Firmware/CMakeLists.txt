@@ -40,6 +40,7 @@ add_compile_options(
 include_directories(
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/inc
+    ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/HAL_Driver/Inc
     ${CMAKE_SOURCE_DIR}/CMSIS/device
     ${CMAKE_SOURCE_DIR}/CMSIS/core
@@ -84,21 +85,21 @@ add_definitions(
 # list of modules to build final firmware (without extension .c or .cpp)
 add_executable(${PROJECT_NAME}
     src/main.c
-    src/app_coordinator.c
-    src/app_fsm.c
-    src/storage_service.c
-    src/dataset_service.c
-    src/sd_file_browser.c
-    src/sd_file_browser_view.c
-    src/sd_file_browser_presenter.c
-    src/data_viewer.c
-    src/data_viewer_view.c
-    src/data_viewer_presenter.c
-    src/calibration.c
-    src/reconstruction_viewer.c
-    src/reconstruction_viewer_view.c
-    src/reconstruction_viewer_presenter.c
-    src/lbp_reconstruction.c
+    src/app/app_coordinator.c
+    src/app/app_fsm.c
+    src/services/storage_service.c
+    src/services/dataset_service.c
+    src/services/calibration.c
+    src/screens/browser/sd_file_browser.c
+    src/screens/browser/sd_file_browser_view.c
+    src/screens/browser/sd_file_browser_presenter.c
+    src/screens/data_viewer/data_viewer.c
+    src/screens/data_viewer/data_viewer_view.c
+    src/screens/data_viewer/data_viewer_presenter.c
+    src/screens/reconstruction/reconstruction_viewer.c
+    src/screens/reconstruction/reconstruction_viewer_view.c
+    src/screens/reconstruction/reconstruction_viewer_presenter.c
+    src/algorithms/lbp_reconstruction.c
     src/stm32f7xx_it.c
     src/syscalls.c
     src/system_stm32f7xx.c
