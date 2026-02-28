@@ -30,6 +30,18 @@ static void save_btn_clicked(lv_event_t *e)
     }
 }
 
+static void play_pause_btn_clicked(lv_event_t *e)
+{
+    reconstruction_viewer_view_t *view = (reconstruction_viewer_view_t *)lv_event_get_user_data(e);
+    if (!view) return;
+
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+
+    if (view->bindings.on_play_pause) {
+        view->bindings.on_play_pause(view->bindings.ctx);
+    }
+}
+
 static void create_canvas(reconstruction_viewer_view_t *view)
 {
     view->canvas = lv_canvas_create(view->cont);
@@ -94,6 +106,12 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     lv_obj_set_style_text_font(view->label_status, &lv_font_montserrat_14, 0);
     lv_obj_align(view->label_status, LV_ALIGN_TOP_MID, 0, 40);
 
+    view->label_fps = lv_label_create(view->cont);
+    lv_label_set_text(view->label_fps, "-- FPS");
+    lv_obj_set_style_text_color(view->label_fps, lv_color_hex(0x00ff00), 0);
+    lv_obj_set_style_text_font(view->label_fps, &lv_font_montserrat_14, 0);
+    lv_obj_align(view->label_fps, LV_ALIGN_TOP_RIGHT, -15, 15);
+
     create_canvas(view);
     add_electrode_markers(view);
 
@@ -105,9 +123,21 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     lv_obj_add_event_cb(btn_return, return_btn_clicked, LV_EVENT_CLICKED, view);
 
     lv_obj_t *label_return = lv_label_create(btn_return);
-    lv_label_set_text(label_return, LV_SYMBOL_LEFT " RETURN TO MENU");
+    lv_label_set_text(label_return, LV_SYMBOL_LEFT " RETURN");
     lv_obj_set_style_text_color(label_return, lv_color_white(), 0);
     lv_obj_center(label_return);
+
+    view->btn_play_pause = lv_button_create(view->cont);
+    lv_obj_set_size(view->btn_play_pause, 140, 50);
+    lv_obj_align(view->btn_play_pause, LV_ALIGN_BOTTOM_MID, 0, -20);
+    lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0x2a9d2a), 0);
+    lv_obj_set_style_radius(view->btn_play_pause, 5, 0);
+    lv_obj_add_event_cb(view->btn_play_pause, play_pause_btn_clicked, LV_EVENT_CLICKED, view);
+
+    view->label_play_pause_text = lv_label_create(view->btn_play_pause);
+    lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PLAY " PLAY");
+    lv_obj_set_style_text_color(view->label_play_pause_text, lv_color_white(), 0);
+    lv_obj_center(view->label_play_pause_text);
 
     view->btn_save = lv_button_create(view->cont);
     lv_obj_set_size(view->btn_save, 180, 50);
@@ -194,4 +224,28 @@ void reconstruction_viewer_view_render_rgb565(reconstruction_viewer_view_t *view
     }
 
     lv_obj_invalidate(view->canvas);
+}
+
+void reconstruction_viewer_view_set_fps(reconstruction_viewer_view_t *view, uint32_t fps_x10)
+{
+    if (!view || !view->label_fps) return;
+
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%lu.%lu FPS",
+             (unsigned long)(fps_x10 / 10u),
+             (unsigned long)(fps_x10 % 10u));
+    lv_label_set_text(view->label_fps, buf);
+}
+
+void reconstruction_viewer_view_set_play_state(reconstruction_viewer_view_t *view, int playing)
+{
+    if (!view || !view->btn_play_pause || !view->label_play_pause_text) return;
+
+    if (playing) {
+        lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PAUSE " PAUSE");
+        lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0xd44a00), 0);
+    } else {
+        lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PLAY " PLAY");
+        lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0x2a9d2a), 0);
+    }
 }

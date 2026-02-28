@@ -13,6 +13,11 @@ static void presenter_cleanup(reconstruction_viewer_presenter_t *p)
 {
     if (!p) return;
 
+    if (p->acq_timer) {
+        lv_timer_del(p->acq_timer);
+        p->acq_timer = NULL;
+    }
+
     if (p->save_timer) {
         lv_timer_del(p->save_timer);
         p->save_timer = NULL;
@@ -22,6 +27,18 @@ static void presenter_cleanup(reconstruction_viewer_presenter_t *p)
         lbp_free_result(p->recon_result);
         p->recon_result = NULL;
     }
+
+    if (p->ref_uel) {
+        dataset_service_free_uel_2d(p->ref_uel);
+        p->ref_uel = NULL;
+    }
+
+    if (p->target_uel) {
+        dataset_service_free_uel_2d(p->target_uel);
+        p->target_uel = NULL;
+    }
+
+    p->is_playing = 0;
 }
 
 static void recon_return_async_cb(void *user_data)
@@ -221,6 +238,42 @@ static void save_start_async_cb(void *user_data)
     p->save_timer = lv_timer_create(save_timer_cb, 10, p);
 }
 
+/* ---------- Continuous acquisition timer ---------- */
+static void acq_timer_cb(lv_timer_t *t)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)lv_timer_get_user_data(t);
+    if (!p || !p->view || !p->ref_uel || !p->target_uel) return;
+
+    /* Free previous result (image_data is heap, color_buffer is SDRAM) */
+    if (p->recon_result) {
+        lbp_free_result(p->recon_result);
+        p->recon_result = NULL;
+    }
+
+    /* Reconstruct */
+    p->recon_result = lbp_reconstruct(p->ref_uel[0], p->target_uel[0],
+                                       p->acq_n_meas, p->acq_n_inj);
+
+    if (!p->recon_result || !p->recon_result->success) return;
+
+    /* Render to canvas */
+    reconstruction_viewer_view_render_rgb565(p->view,
+                                             p->recon_result->color_buffer,
+                                             p->recon_result->display_size,
+                                             p->recon_result->display_size);
+
+    /* FPS tracking — update every second */
+    p->frame_count++;
+    uint32_t now = lv_tick_get();
+    uint32_t elapsed = now - p->fps_tick_start;
+    if (elapsed >= 1000u) {
+        uint32_t fps_x10 = (p->frame_count * 10000u) / elapsed;
+        reconstruction_viewer_view_set_fps(p->view, fps_x10);
+        p->frame_count = 0;
+        p->fps_tick_start = now;
+    }
+}
+
 void reconstruction_viewer_presenter_init(reconstruction_viewer_presenter_t *presenter, reconstruction_viewer_view_t *view)
 {
     if (!presenter) return;
@@ -244,8 +297,8 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
     reconstruction_viewer_view_set_status(presenter->view, "Loading reference data...");
 
     uint16_t ref_n_meas = 0, ref_n_inj = 0;
-    float **ref_uel = dataset_service_load_uel_2d("datamat_1_0.bin", &ref_n_meas, &ref_n_inj);
-    if (!ref_uel) {
+    presenter->ref_uel = dataset_service_load_uel_2d("datamat_1_0.bin", &ref_n_meas, &ref_n_inj);
+    if (!presenter->ref_uel) {
         reconstruction_viewer_view_set_status(presenter->view, "ERROR: Reference file datamat_1_0.bin not found on SD card");
         return;
     }
@@ -253,9 +306,10 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
     reconstruction_viewer_view_set_status(presenter->view, "Loading target data...");
 
     uint16_t tgt_n_meas = 0, tgt_n_inj = 0;
-    float **tgt_uel = dataset_service_load_uel_2d(filename, &tgt_n_meas, &tgt_n_inj);
-    if (!tgt_uel) {
-        dataset_service_free_uel_2d(ref_uel);
+    presenter->target_uel = dataset_service_load_uel_2d(filename, &tgt_n_meas, &tgt_n_inj);
+    if (!presenter->target_uel) {
+        dataset_service_free_uel_2d(presenter->ref_uel);
+        presenter->ref_uel = NULL;
         char err[128];
         snprintf(err, sizeof(err), "ERROR: Failed to load target file %s", filename);
         reconstruction_viewer_view_set_status(presenter->view, err);
@@ -263,8 +317,10 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
     }
 
     if (ref_n_meas != tgt_n_meas || ref_n_inj != tgt_n_inj) {
-        dataset_service_free_uel_2d(ref_uel);
-        dataset_service_free_uel_2d(tgt_uel);
+        dataset_service_free_uel_2d(presenter->ref_uel);
+        presenter->ref_uel = NULL;
+        dataset_service_free_uel_2d(presenter->target_uel);
+        presenter->target_uel = NULL;
         char err[128];
         snprintf(err, sizeof(err), "ERROR: Dimension mismatch ref[%dx%d] vs tgt[%dx%d]",
                  (int)ref_n_meas, (int)ref_n_inj, (int)tgt_n_meas, (int)tgt_n_inj);
@@ -272,23 +328,26 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
         return;
     }
 
+    presenter->acq_n_meas = ref_n_meas;
+    presenter->acq_n_inj = ref_n_inj;
+
     reconstruction_viewer_view_set_status(presenter->view, "Performing reconstruction...");
 
     if (!lbp_get_matrix_info()) {
         reconstruction_viewer_view_set_status(presenter->view, "Initializing LBP (loading sensitivity matrix)...");
 
         if (!lbp_init()) {
-            dataset_service_free_uel_2d(ref_uel);
-            dataset_service_free_uel_2d(tgt_uel);
+            dataset_service_free_uel_2d(presenter->ref_uel);
+            presenter->ref_uel = NULL;
+            dataset_service_free_uel_2d(presenter->target_uel);
+            presenter->target_uel = NULL;
             reconstruction_viewer_view_set_status(presenter->view, "ERROR: Failed to load sensitivity_matrix.bin from SD card");
             return;
         }
     }
 
-    presenter->recon_result = lbp_reconstruct(ref_uel[0], tgt_uel[0], ref_n_meas, ref_n_inj);
-
-    dataset_service_free_uel_2d(ref_uel);
-    dataset_service_free_uel_2d(tgt_uel);
+    presenter->recon_result = lbp_reconstruct(presenter->ref_uel[0], presenter->target_uel[0],
+                                               presenter->acq_n_meas, presenter->acq_n_inj);
 
     if (!presenter->recon_result || !presenter->recon_result->success) {
         char err[256];
@@ -315,6 +374,14 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
     reconstruction_viewer_view_set_status(presenter->view, status);
 
     reconstruction_viewer_view_set_save_enabled(presenter->view, 1);
+
+    /* Create acquisition timer (initially paused — press PLAY to start loop) */
+    presenter->acq_timer = lv_timer_create(acq_timer_cb, 0, presenter);
+    lv_timer_pause(presenter->acq_timer);
+    presenter->is_playing = 0;
+    presenter->frame_count = 0;
+    presenter->fps_tick_start = lv_tick_get();
+    reconstruction_viewer_view_set_play_state(presenter->view, 0);
 }
 
 void reconstruction_viewer_presenter_on_return(void *ctx)
@@ -330,5 +397,30 @@ void reconstruction_viewer_presenter_on_save(void *ctx)
     reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
     if (!p || p->save_timer) return;
 
+    /* Auto-pause acquisition during save */
+    if (p->is_playing && p->acq_timer) {
+        p->is_playing = 0;
+        lv_timer_pause(p->acq_timer);
+        reconstruction_viewer_view_set_play_state(p->view, 0);
+    }
+
     lv_async_call(save_start_async_cb, p);
+}
+
+void reconstruction_viewer_presenter_on_play_pause(void *ctx)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
+    if (!p || !p->acq_timer) return;
+
+    p->is_playing = !p->is_playing;
+
+    if (p->is_playing) {
+        p->frame_count = 0;
+        p->fps_tick_start = lv_tick_get();
+        lv_timer_resume(p->acq_timer);
+    } else {
+        lv_timer_pause(p->acq_timer);
+    }
+
+    reconstruction_viewer_view_set_play_state(p->view, p->is_playing);
 }

@@ -19,6 +19,16 @@ typedef struct {
     char current_filename[128];
     ReconstructionResult *recon_result;
 
+    /* Continuous acquisition loop */
+    lv_timer_t *acq_timer;
+    float **ref_uel;
+    float **target_uel;
+    uint16_t acq_n_meas;
+    uint16_t acq_n_inj;
+    uint32_t frame_count;
+    uint32_t fps_tick_start;
+    int is_playing;
+
     lv_timer_t *save_timer;
     FIL save_file;
     char save_path[64];
@@ -33,6 +43,7 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
 
 void reconstruction_viewer_presenter_on_return(void *ctx);
 void reconstruction_viewer_presenter_on_save(void *ctx);
+void reconstruction_viewer_presenter_on_play_pause(void *ctx);
 
 #ifdef __cplusplus
 }
