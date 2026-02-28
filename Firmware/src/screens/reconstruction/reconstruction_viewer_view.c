@@ -1,10 +1,66 @@
 #include "reconstruction_viewer_view.h"
 
+#include "eit_config.h"
+
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
 
-#define DISPLAY_SIZE 288
+#define DISPLAY_SIZE  EIT_DISPLAY_SIZE
+#define NUM_ELEC      EIT_NUM_ELECTRODES
+#define PI_F          3.14159265f
+
+/* ---- Pre-computed overlay mask (computed once, applied every frame) ---- */
+/* Bitmask: 1 bit per pixel, packed into uint32_t words */
+#define OVERLAY_WORDS ((DISPLAY_SIZE * DISPLAY_SIZE + 31u) / 32u)
+static uint32_t s_overlay_mask[OVERLAY_WORDS];
+static int s_overlay_ready = 0;
+
+static void overlay_set_pixel(int x, int y)
+{
+    if (x < 0 || x >= DISPLAY_SIZE || y < 0 || y >= DISPLAY_SIZE) return;
+    uint32_t idx = (uint32_t)(y * DISPLAY_SIZE + x);
+    s_overlay_mask[idx >> 5] |= (1u << (idx & 31u));
+}
+
+static void precompute_overlay(void)
+{
+    if (s_overlay_ready) return;
+    memset(s_overlay_mask, 0, sizeof(s_overlay_mask));
+
+    const int center = DISPLAY_SIZE / 2;
+    const int radius = DISPLAY_SIZE / 2;
+
+    /* Circle border — fine angle steps, 3-pixel wide line */
+    const int num_steps = 1440;
+    for (int s = 0; s < num_steps; s++) {
+        const float angle = s * (2.0f * PI_F) / num_steps;
+        const float ca = cosf(angle);
+        const float sa = sinf(angle);
+        for (int r = radius - 3; r <= radius - 1; r++) {
+            overlay_set_pixel(center + (int)(r * ca), center - (int)(r * sa));
+        }
+    }
+
+    /* Electrode dots — centered on circle border line */
+    const int dot_r = 5;
+    const int electrode_radius = radius - 2;
+    for (int i = 0; i < (int)NUM_ELEC; i++) {
+        const float angle = (i * 2.0f * PI_F) / (float)NUM_ELEC;
+        const int ex = center + (int)(electrode_radius * cosf(angle));
+        const int ey = center - (int)(electrode_radius * sinf(angle));
+
+        for (int dy = -dot_r; dy <= dot_r; dy++) {
+            for (int dx = -dot_r; dx <= dot_r; dx++) {
+                if (dx * dx + dy * dy <= dot_r * dot_r) {
+                    overlay_set_pixel(ex + dx, ey + dy);
+                }
+            }
+        }
+    }
+
+    s_overlay_ready = 1;
+}
 
 static void return_btn_clicked(lv_event_t *e)
 {
@@ -84,8 +140,8 @@ static void add_electrode_markers(reconstruction_viewer_view_t *view)
     const int center_y = DISPLAY_SIZE / 2;
     const int radius = DISPLAY_SIZE / 2 + 20;
 
-    for (int i = 0; i < 16; i++) {
-        const float angle = (i * 2.0f * 3.14159f) / 16.0f;
+    for (int i = 0; i < (int)NUM_ELEC; i++) {
+        const float angle = (i * 2.0f * PI_F) / (float)NUM_ELEC;
         const int x = center_x + (int)(radius * cosf(angle));
         const int y = center_y - (int)(radius * sinf(angle));
 
@@ -253,42 +309,23 @@ void reconstruction_viewer_view_render_rgb565(reconstruction_viewer_view_t *view
 
     memcpy(canvas_buf, rgb565, DISPLAY_SIZE * DISPLAY_SIZE * sizeof(uint16_t));
 
+    /* Apply pre-computed overlay mask (fast bit-test loop, no trig) */
+    precompute_overlay();
     uint16_t *buf16 = (uint16_t *)canvas_buf;
     const uint16_t white_color = 0xFFFF;
-    const int center = DISPLAY_SIZE / 2;
-    const int radius = DISPLAY_SIZE / 2;
+    const uint32_t total_pixels = DISPLAY_SIZE * DISPLAY_SIZE;
 
-    /* Draw circle border using finer angle steps to avoid gaps */
-    const int num_steps = 1440;  /* 0.25-degree steps for a continuous line */
-    for (int s = 0; s < num_steps; s++) {
-        const float angle = s * (2.0f * 3.14159f) / num_steps;
-        for (int r = radius - 3; r <= radius - 1; r++) {
-            const int x = center + (int)(r * cosf(angle));
-            const int y = center - (int)(r * sinf(angle));
-            if (x >= 0 && x < DISPLAY_SIZE && y >= 0 && y < DISPLAY_SIZE) {
-                buf16[y * DISPLAY_SIZE + x] = white_color;
+    for (uint32_t word = 0; word < OVERLAY_WORDS; word++) {
+        uint32_t bits = s_overlay_mask[word];
+        if (bits == 0) continue;  /* Skip empty words (common case) */
+        uint32_t base = word << 5;
+        while (bits) {
+            uint32_t bit = bits & (uint32_t)(-(int32_t)bits); /* lowest set bit */
+            uint32_t idx = base + (uint32_t)__builtin_ctz(bits);
+            if (idx < total_pixels) {
+                buf16[idx] = white_color;
             }
-        }
-    }
-
-    /* Electrode dots – centered on the circle border line (radius - 2) */
-    const int dot_r = 5;
-    const int electrode_radius = radius - 2;
-    for (int i = 0; i < 16; i++) {
-        const float angle = (i * 2.0f * 3.14159f) / 16.0f;
-        const int ex = center + (int)(electrode_radius * cosf(angle));
-        const int ey = center - (int)(electrode_radius * sinf(angle));
-
-        for (int dy = -dot_r; dy <= dot_r; dy++) {
-            for (int dx = -dot_r; dx <= dot_r; dx++) {
-                if (dx * dx + dy * dy <= dot_r * dot_r) {
-                    const int px = ex + dx;
-                    const int py = ey + dy;
-                    if (px >= 0 && px < DISPLAY_SIZE && py >= 0 && py < DISPLAY_SIZE) {
-                        buf16[py * DISPLAY_SIZE + px] = white_color;
-                    }
-                }
-            }
+            bits ^= bit;
         }
     }
 

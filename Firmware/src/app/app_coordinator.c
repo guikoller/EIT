@@ -16,11 +16,13 @@ static app_event_t s_evt_q[APP_EVENT_QUEUE_SIZE];
 static uint8_t s_evt_q_head = 0u;
 static uint8_t s_evt_q_tail = 0u;
 static uint8_t s_evt_q_count = 0u;
+static uint32_t s_evt_q_overflow = 0u;  /* debug: counts dropped events */
 
 static int evt_q_push(const app_event_t *evt)
 {
     if (!evt) return 0;
     if (s_evt_q_count >= APP_EVENT_QUEUE_SIZE) {
+        s_evt_q_overflow++;
         return 0;
     }
 
@@ -113,10 +115,12 @@ void app_coordinator_tick(void)
     }
 
     app_fsm_tick(&s_app);
-    app_apply_requested_screen();
 
-    /* Let LVGL render the (possibly) new screen without waiting a full tick. */
-    lv_task_handler();
+    /* Apply screen transition if any, then immediately render the new screen. */
+    if (s_app.requested_screen != APP_SCREEN_NONE) {
+        app_apply_requested_screen();
+        lv_task_handler();  /* Render newly-created screen without waiting a tick */
+    }
 }
 
 void app_coordinator_post_event(const app_event_t *event)

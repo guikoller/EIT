@@ -1,5 +1,6 @@
 #include "eit_acq_simulated.h"
 #include "dataset_service.h"
+#include "eit_config.h"
 
 #include "lvgl.h"
 
@@ -272,7 +273,7 @@ eit_acq_backend_t *eit_acq_simulated_create(const char *ref_filename,
 
     /* Defaults */
     sim->noise_enabled   = 0;
-    sim->noise_level_pct = 10;
+    sim->noise_level_pct = EIT_NOISE_LEVEL_DEFAULT;
     sim->rng_state       = 0xDEADBEEFu;
 
     sim->inject_time_ms  = 1;   /* 1 ms per injection step  */
@@ -313,7 +314,7 @@ void eit_acq_simulated_set_noise(eit_acq_backend_t *backend,
     if (!backend) return;
     eit_acq_simulated_t *sim = (eit_acq_simulated_t *)backend;
     sim->noise_enabled = enabled;
-    if (level_pct < 0)   level_pct = 0;
-    if (level_pct > 100) level_pct = 100;
+    if (level_pct < 0)  level_pct = 0;
+    if (level_pct > EIT_NOISE_LEVEL_MAX) level_pct = EIT_NOISE_LEVEL_MAX;
     sim->noise_level_pct = level_pct;
 }

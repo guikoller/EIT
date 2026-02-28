@@ -1,34 +1,13 @@
 #include "calibration.h"
 
 #include "dataset_format.h"
+#include "sensitivity_matrix_format.h"
+#include "eit_config.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define SENS_MAGIC 0x53454E53u
-
-/* Image size is fixed to 32x32 for the firmware pipeline. */
-#define CAL_IMAGE_SIZE 32u
-#define CAL_MAX_PIXELS (CAL_IMAGE_SIZE * CAL_IMAGE_SIZE)
-
-/* Use SDRAM for the big precomputed electrode field buffer to avoid heap use.
- * Must not overlap LTDC framebuffers, LBP matrix (0xC0400000) or color buffer (0xC0900000).
- */
-#define CAL_ELEC_FIELD_ADDR ((uint32_t)0xC0A00000u)
-
-typedef struct {
-    uint32_t magic;
-    uint32_t n_measurements;
-    uint32_t n_pixels;
-    uint32_t image_size;
-    uint32_t n_inj;
-    uint32_t n_meas;
-    uint32_t reserved[2];
-} SensitivityMatrixHeader;
-
-_Static_assert(sizeof(SensitivityMatrixHeader) == 32, "SensitivityMatrixHeader must be 32 bytes");
 
 static FIL s_out;
 static calib_status_t s_status = CALIB_STATUS_IDLE;
@@ -56,8 +35,8 @@ static int8_t *s_mp = NULL; /* [n_elec * n_meas] */
 static float *s_elec_field = NULL;
 
 /* Per-row working buffers kept out of heap (similar spirit to BMP saver). */
-static float s_inj_field_buf[2u * CAL_MAX_PIXELS];
-static float s_row_buf_buf[CAL_MAX_PIXELS];
+static float s_inj_field_buf[2u * EIT_MAX_PIXELS];
+static float s_row_buf_buf[EIT_MAX_PIXELS];
 
 static void free_work_buffers(void)
 {
@@ -197,7 +176,7 @@ static void compute_row(uint16_t inj, uint16_t meas)
     (void)inj;
 }
 
-int calibration_begin_from_dataset(const char *dataset_filename, const char *output_filename)
+int sensitivity_matrix_begin_from_dataset(const char *dataset_filename, const char *output_filename)
 {
     if (s_status == CALIB_STATUS_RUNNING) return 0;
     free_work_buffers();
@@ -237,7 +216,7 @@ int calibration_begin_from_dataset(const char *dataset_filename, const char *out
 
     s_n_meas = hdr.n_meas;
     s_n_inj = hdr.n_inj;
-    s_image_size = CAL_IMAGE_SIZE;
+    s_image_size = EIT_IMAGE_SIZE;
     s_n_elec = hdr.curr_pattern_rows;
 
     if (hdr.curr_pattern_rows == 0 || hdr.meas_pattern_rows == 0) {
@@ -259,7 +238,7 @@ int calibration_begin_from_dataset(const char *dataset_filename, const char *out
     }
 
     s_n_pixels = (uint32_t)s_image_size * (uint32_t)s_image_size;
-    if (s_n_pixels > CAL_MAX_PIXELS) {
+    if (s_n_pixels > EIT_MAX_PIXELS) {
         f_close(&ds);
         fail(CALIB_STAGE_READ_HEADER, FR_INVALID_PARAMETER);
         return 0;
@@ -305,7 +284,7 @@ int calibration_begin_from_dataset(const char *dataset_filename, const char *out
     f_close(&ds);
 
     /* Use SDRAM for big electrode field precompute buffer; avoid heap exhaustion. */
-    s_elec_field = (float *)CAL_ELEC_FIELD_ADDR;
+    s_elec_field = (float *)EIT_SDRAM_ELEC_FIELD_ADDR;
 
     s_stage = CALIB_STAGE_PRECOMPUTE_FIELDS;
     precompute_electrode_fields(1.1f, 0.4f);
@@ -320,7 +299,7 @@ int calibration_begin_from_dataset(const char *dataset_filename, const char *out
 
     SensitivityMatrixHeader sh;
     memset(&sh, 0, sizeof(sh));
-    sh.magic = SENS_MAGIC;
+    sh.magic = SENS_MATRIX_MAGIC;
     sh.n_measurements = s_n_rows_total;
     sh.n_pixels = s_n_pixels;
     sh.image_size = s_image_size;
@@ -347,12 +326,7 @@ int calibration_begin_from_dataset(const char *dataset_filename, const char *out
     return 1;
 }
 
-int sensitivity_matrix_begin_from_dataset(const char *dataset_filename, const char *output_filename)
-{
-    return calibration_begin_from_dataset(dataset_filename, output_filename);
-}
-
-calib_status_t calibration_step(calib_progress_t *out)
+calib_status_t sensitivity_matrix_step(calib_progress_t *out)
 {
     if (out) {
         out->status = s_status;
@@ -409,12 +383,7 @@ calib_status_t calibration_step(calib_progress_t *out)
     return s_status;
 }
 
-calib_status_t sensitivity_matrix_step(calib_progress_t *out)
-{
-    return calibration_step(out);
-}
-
-void calibration_cancel(void)
+void sensitivity_matrix_cancel(void)
 {
     if (s_status == CALIB_STATUS_RUNNING) {
         f_close(&s_out);
@@ -423,27 +392,14 @@ void calibration_cancel(void)
     reset_state();
 }
 
-void sensitivity_matrix_cancel(void)
-{
-    calibration_cancel();
-}
-
-FRESULT calibration_last_fresult(void)
+FRESULT sensitivity_matrix_last_fresult(void)
 {
     return s_last_res;
 }
 
-FRESULT sensitivity_matrix_last_fresult(void)
-{
-    return calibration_last_fresult();
-}
-
-calib_stage_t calibration_last_stage(void)
+calib_stage_t sensitivity_matrix_last_stage(void)
 {
     return s_stage;
 }
 
-calib_stage_t sensitivity_matrix_last_stage(void)
-{
-    return calibration_last_stage();
-}
+

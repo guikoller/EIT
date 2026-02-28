@@ -2,11 +2,12 @@
 
 #include "app/app_coordinator.h"
 #include "services/eit_acq_simulated.h"
+#include "eit_config.h"
 
 #include <string.h>
 #include <stdio.h>
 
-#define DISPLAY_SIZE 288
+#define DISPLAY_SIZE  EIT_DISPLAY_SIZE
 
 static void presenter_cleanup(reconstruction_viewer_presenter_t *p)
 {
@@ -22,10 +23,8 @@ static void presenter_cleanup(reconstruction_viewer_presenter_t *p)
         p->save_timer = NULL;
     }
 
-    if (p->recon_result) {
-        lbp_free_result(p->recon_result);
-        p->recon_result = NULL;
-    }
+    /* recon_result points to static LBP buffer — just clear the pointer */
+    p->recon_result = NULL;
 
     /* Destroy acquisition backend (frees all loaded data) */
     if (p->acq_backend) {
@@ -252,13 +251,10 @@ static void acq_timer_cb(lv_timer_t *t)
         eit_frame_t frame;
         if (!eit_acquisition_get_frame(&frame)) return;
 
-        /* Free previous result */
-        if (p->recon_result) {
-            lbp_free_result(p->recon_result);
-            p->recon_result = NULL;
-        }
-
-        /* Reconstruct: delta_v = target - reference */
+        /* Reconstruct: delta_v = target - reference
+         * lbp_reconstruct uses static buffers — no malloc/free per frame.
+         * Result pointer is valid until next lbp_reconstruct() call.
+         */
         p->recon_result = lbp_reconstruct(p->ref_frame.uel, frame.uel,
                                            p->acq_n_meas, p->acq_n_inj);
 
@@ -301,7 +297,7 @@ void reconstruction_viewer_presenter_init(reconstruction_viewer_presenter_t *pre
     presenter->view = view;
     presenter->save_last_res = FR_OK;
     presenter->noise_enabled = 0;
-    presenter->noise_level_pct = 10;
+    presenter->noise_level_pct = EIT_NOISE_LEVEL_DEFAULT;
 }
 
 void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t *presenter, const char *filename)
@@ -452,7 +448,7 @@ void reconstruction_viewer_presenter_on_noise_level(void *ctx, int32_t level)
     if (!p) return;
 
     if (level < 0) level = 0;
-    if (level > 100) level = 100;
+    if (level > EIT_NOISE_LEVEL_MAX) level = EIT_NOISE_LEVEL_MAX;
     p->noise_level_pct = level;
     if (p->acq_backend) {
         eit_acq_simulated_set_noise(p->acq_backend, p->noise_enabled, p->noise_level_pct);

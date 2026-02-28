@@ -22,12 +22,6 @@ void sd_file_browser_presenter_on_create(sd_file_browser_presenter_t *presenter)
 void sd_file_browser_presenter_on_load(void *ctx, const char *filename);
 void sd_file_browser_presenter_on_compute_sens_matrix(void *ctx);
 
-/* Backward-compatible name (older code used "calibrate" wording). */
-static inline void sd_file_browser_presenter_on_calibrate(void *ctx)
-{
-    sd_file_browser_presenter_on_compute_sens_matrix(ctx);
-}
-
 #ifdef __cplusplus
 }
 #endif

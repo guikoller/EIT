@@ -3,6 +3,7 @@
 #include "app/app_coordinator.h"
 #include "services/calibration.h"
 #include "services/storage_service.h"
+#include "eit_config.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -114,18 +115,18 @@ void sd_file_browser_presenter_on_create(sd_file_browser_presenter_t *presenter)
     sd_file_browser_view_set_status(presenter->view, "READY");
     sd_file_browser_view_set_enabled(presenter->view, 1);
 
-    storage_file_entry_t tmp[50];
+    storage_file_entry_t tmp[EIT_MAX_BROWSER_FILES];
     memset(tmp, 0, sizeof(tmp));
 
-    sd_browser_file_entry_t entries[50];
+    sd_browser_file_entry_t entries[EIT_MAX_BROWSER_FILES];
     memset(entries, 0, sizeof(entries));
 
     int count = 0;
-    if (storage_service_scan_root(tmp, 50, &count) != 0) {
+    if (storage_service_scan_root(tmp, EIT_MAX_BROWSER_FILES, &count) != 0) {
         count = 0;
     }
 
-    for (int i = 0; i < count && i < 50; i++) {
+    for (int i = 0; i < count && i < (int)EIT_MAX_BROWSER_FILES; i++) {
         strncpy(entries[i].filename, tmp[i].filename, sizeof(entries[i].filename) - 1);
         entries[i].filename[sizeof(entries[i].filename) - 1] = '\0';
         entries[i].size = tmp[i].size;
