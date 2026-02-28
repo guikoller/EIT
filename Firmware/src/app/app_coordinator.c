@@ -1,6 +1,8 @@
 #include "app_coordinator.h"
 
 #include "app_fsm.h"
+#include "screens/home/home_screen.h"
+#include "screens/settings/settings_screen.h"
 #include "screens/data_viewer/data_viewer.h"
 #include "services/storage_service.h"
 #include "hal_stm_lvgl/tft/tft.h"
@@ -54,6 +56,16 @@ static void app_apply_requested_screen(void)
     lv_obj_clean(lv_screen_active());
 
     switch (s_app.requested_screen) {
+        case APP_SCREEN_HOME:
+            home_screen_create();
+            s_app.active_screen = APP_SCREEN_HOME;
+            break;
+
+        case APP_SCREEN_SETTINGS:
+            settings_screen_create();
+            s_app.active_screen = APP_SCREEN_SETTINGS;
+            break;
+
         case APP_SCREEN_BROWSER:
             sd_file_browser_create();
             s_app.active_screen = APP_SCREEN_BROWSER;

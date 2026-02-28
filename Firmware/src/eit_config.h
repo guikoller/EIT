@@ -60,6 +60,21 @@
 #define EIT_SDRAM_ELEC_FIELD_ADDR   ((uint32_t)0xC0A00000u)
 
 /* ------------------------------------------------------------------ */
+/*  Algorithm selection                                                */
+/* ------------------------------------------------------------------ */
+typedef enum {
+    EIT_ALGO_LBP = 0,
+    /* future: EIT_ALGO_GREIT, EIT_ALGO_DBAR, ... */
+    EIT_ALGO_COUNT
+} eit_algorithm_t;
+
+/** Default reconstruction algorithm. */
+#define EIT_ALGO_DEFAULT        EIT_ALGO_LBP
+
+/** Default "show data table" flag (1 = show, 0 = hide). */
+#define EIT_SHOW_DATA_TABLE_DEFAULT  1
+
+/* ------------------------------------------------------------------ */
 /*  File browser                                                       */
 /* ------------------------------------------------------------------ */
 /** Maximum number of files the SD browser can display. */
