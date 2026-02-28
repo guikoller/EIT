@@ -42,6 +42,31 @@ static void play_pause_btn_clicked(lv_event_t *e)
     }
 }
 
+static void noise_btn_clicked(lv_event_t *e)
+{
+    reconstruction_viewer_view_t *view = (reconstruction_viewer_view_t *)lv_event_get_user_data(e);
+    if (!view) return;
+
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+
+    if (view->bindings.on_noise_toggle) {
+        view->bindings.on_noise_toggle(view->bindings.ctx);
+    }
+}
+
+static void noise_slider_changed(lv_event_t *e)
+{
+    reconstruction_viewer_view_t *view = (reconstruction_viewer_view_t *)lv_event_get_user_data(e);
+    if (!view) return;
+
+    if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
+
+    int32_t val = lv_slider_get_value(view->slider_noise);
+    if (view->bindings.on_noise_level) {
+        view->bindings.on_noise_level(view->bindings.ctx, val);
+    }
+}
+
 static void create_canvas(reconstruction_viewer_view_t *view)
 {
     view->canvas = lv_canvas_create(view->cont);
@@ -49,7 +74,7 @@ static void create_canvas(reconstruction_viewer_view_t *view)
     static lv_color_t canvas_buf[DISPLAY_SIZE * DISPLAY_SIZE];
     lv_canvas_set_buffer(view->canvas, canvas_buf, DISPLAY_SIZE, DISPLAY_SIZE, LV_COLOR_FORMAT_RGB565);
 
-    lv_obj_align(view->canvas, LV_ALIGN_CENTER, 0, 20);
+    lv_obj_align(view->canvas, LV_ALIGN_CENTER, -30, 20);
     lv_canvas_fill_bg(view->canvas, lv_color_hex(0x000000), LV_OPA_COVER);
 }
 
@@ -115,9 +140,61 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     create_canvas(view);
     add_electrode_markers(view);
 
+    /* ---- Left-side controls (play/pause, noise toggle) ---- */
+    view->btn_play_pause = lv_button_create(view->cont);
+    lv_obj_set_size(view->btn_play_pause, 60, 50);
+    lv_obj_align(view->btn_play_pause, LV_ALIGN_LEFT_MID, 10, -20);
+    lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0x2a9d2a), 0);
+    lv_obj_set_style_radius(view->btn_play_pause, 5, 0);
+    lv_obj_add_event_cb(view->btn_play_pause, play_pause_btn_clicked, LV_EVENT_CLICKED, view);
+
+    view->label_play_pause_text = lv_label_create(view->btn_play_pause);
+    lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PLAY);
+    lv_obj_set_style_text_color(view->label_play_pause_text, lv_color_white(), 0);
+    lv_obj_center(view->label_play_pause_text);
+
+    view->btn_noise = lv_button_create(view->cont);
+    lv_obj_set_size(view->btn_noise, 60, 40);
+    lv_obj_align(view->btn_noise, LV_ALIGN_LEFT_MID, 10, 40);
+    lv_obj_set_style_bg_color(view->btn_noise, lv_color_hex(0x555555), 0);
+    lv_obj_set_style_radius(view->btn_noise, 5, 0);
+    lv_obj_add_event_cb(view->btn_noise, noise_btn_clicked, LV_EVENT_CLICKED, view);
+
+    view->label_noise_text = lv_label_create(view->btn_noise);
+    lv_label_set_text(view->label_noise_text, "N:OFF");
+    lv_obj_set_style_text_color(view->label_noise_text, lv_color_white(), 0);
+    lv_obj_set_style_text_font(view->label_noise_text, &lv_font_montserrat_14, 0);
+    lv_obj_center(view->label_noise_text);
+
+    /* ---- Right-side vertical noise slider ---- */
+    view->slider_noise = lv_slider_create(view->cont);
+    lv_obj_set_size(view->slider_noise, 30, 200);
+    lv_obj_align(view->slider_noise, LV_ALIGN_RIGHT_MID, -30, 10);
+    lv_slider_set_range(view->slider_noise, 0, 100);
+    lv_slider_set_value(view->slider_noise, 10, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(view->slider_noise, lv_color_hex(0x333333), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(view->slider_noise, lv_color_hex(0xd4aa00), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(view->slider_noise, lv_color_white(), LV_PART_KNOB);
+    lv_obj_add_event_cb(view->slider_noise, noise_slider_changed, LV_EVENT_VALUE_CHANGED, view);
+
+    /* Noise percentage label (above slider) */
+    view->label_noise_pct = lv_label_create(view->cont);
+    lv_label_set_text(view->label_noise_pct, "10%");
+    lv_obj_set_style_text_color(view->label_noise_pct, lv_color_hex(0xd4aa00), 0);
+    lv_obj_set_style_text_font(view->label_noise_pct, &lv_font_montserrat_14, 0);
+    lv_obj_align_to(view->label_noise_pct, view->slider_noise, LV_ALIGN_OUT_TOP_MID, 0, -8);
+
+    /* Slider label at bottom */
+    lv_obj_t *label_slider_title = lv_label_create(view->cont);
+    lv_label_set_text(label_slider_title, "NOISE");
+    lv_obj_set_style_text_color(label_slider_title, lv_color_hex(0x888888), 0);
+    lv_obj_set_style_text_font(label_slider_title, &lv_font_montserrat_14, 0);
+    lv_obj_align_to(label_slider_title, view->slider_noise, LV_ALIGN_OUT_BOTTOM_MID, 0, 8);
+
+    /* ---- Bottom bar: RETURN (left) and SAVE (right) ---- */
     lv_obj_t *btn_return = lv_button_create(view->cont);
-    lv_obj_set_size(btn_return, 180, 50);
-    lv_obj_align(btn_return, LV_ALIGN_BOTTOM_LEFT, 20, -20);
+    lv_obj_set_size(btn_return, 160, 45);
+    lv_obj_align(btn_return, LV_ALIGN_BOTTOM_LEFT, 15, -10);
     lv_obj_set_style_bg_color(btn_return, lv_color_hex(0x666666), 0);
     lv_obj_set_style_radius(btn_return, 5, 0);
     lv_obj_add_event_cb(btn_return, return_btn_clicked, LV_EVENT_CLICKED, view);
@@ -127,21 +204,9 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     lv_obj_set_style_text_color(label_return, lv_color_white(), 0);
     lv_obj_center(label_return);
 
-    view->btn_play_pause = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_play_pause, 140, 50);
-    lv_obj_align(view->btn_play_pause, LV_ALIGN_BOTTOM_MID, 0, -20);
-    lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0x2a9d2a), 0);
-    lv_obj_set_style_radius(view->btn_play_pause, 5, 0);
-    lv_obj_add_event_cb(view->btn_play_pause, play_pause_btn_clicked, LV_EVENT_CLICKED, view);
-
-    view->label_play_pause_text = lv_label_create(view->btn_play_pause);
-    lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PLAY " PLAY");
-    lv_obj_set_style_text_color(view->label_play_pause_text, lv_color_white(), 0);
-    lv_obj_center(view->label_play_pause_text);
-
     view->btn_save = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_save, 180, 50);
-    lv_obj_align(view->btn_save, LV_ALIGN_BOTTOM_RIGHT, -20, -20);
+    lv_obj_set_size(view->btn_save, 160, 45);
+    lv_obj_align(view->btn_save, LV_ALIGN_BOTTOM_RIGHT, -15, -10);
     lv_obj_set_style_bg_color(view->btn_save, lv_color_hex(0x2a7da8), 0);
     lv_obj_set_style_radius(view->btn_save, 5, 0);
     lv_obj_add_event_cb(view->btn_save, save_btn_clicked, LV_EVENT_CLICKED, view);
@@ -193,9 +258,11 @@ void reconstruction_viewer_view_render_rgb565(reconstruction_viewer_view_t *view
     const int center = DISPLAY_SIZE / 2;
     const int radius = DISPLAY_SIZE / 2;
 
-    for (int angle_deg = 0; angle_deg < 360; angle_deg++) {
-        const float angle = angle_deg * 3.14159f / 180.0f;
-        for (int r = radius - 2; r <= radius - 1; r++) {
+    /* Draw circle border using finer angle steps to avoid gaps */
+    const int num_steps = 1440;  /* 0.25-degree steps for a continuous line */
+    for (int s = 0; s < num_steps; s++) {
+        const float angle = s * (2.0f * 3.14159f) / num_steps;
+        for (int r = radius - 3; r <= radius - 1; r++) {
             const int x = center + (int)(r * cosf(angle));
             const int y = center - (int)(r * sinf(angle));
             if (x >= 0 && x < DISPLAY_SIZE && y >= 0 && y < DISPLAY_SIZE) {
@@ -204,15 +271,17 @@ void reconstruction_viewer_view_render_rgb565(reconstruction_viewer_view_t *view
         }
     }
 
-    const int electrode_radius = DISPLAY_SIZE / 2 - 1;
+    /* Electrode dots – centered on the circle border line (radius - 2) */
+    const int dot_r = 5;
+    const int electrode_radius = radius - 2;
     for (int i = 0; i < 16; i++) {
         const float angle = (i * 2.0f * 3.14159f) / 16.0f;
         const int ex = center + (int)(electrode_radius * cosf(angle));
         const int ey = center - (int)(electrode_radius * sinf(angle));
 
-        for (int dy = -5; dy <= 5; dy++) {
-            for (int dx = -5; dx <= 5; dx++) {
-                if (dx * dx + dy * dy <= 25) {
+        for (int dy = -dot_r; dy <= dot_r; dy++) {
+            for (int dx = -dot_r; dx <= dot_r; dx++) {
+                if (dx * dx + dy * dy <= dot_r * dot_r) {
                     const int px = ex + dx;
                     const int py = ey + dy;
                     if (px >= 0 && px < DISPLAY_SIZE && py >= 0 && py < DISPLAY_SIZE) {
@@ -242,10 +311,32 @@ void reconstruction_viewer_view_set_play_state(reconstruction_viewer_view_t *vie
     if (!view || !view->btn_play_pause || !view->label_play_pause_text) return;
 
     if (playing) {
-        lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PAUSE " PAUSE");
+        lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PAUSE);
         lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0xd44a00), 0);
     } else {
-        lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PLAY " PLAY");
+        lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PLAY);
         lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0x2a9d2a), 0);
     }
+}
+
+void reconstruction_viewer_view_set_noise_state(reconstruction_viewer_view_t *view, int enabled)
+{
+    if (!view || !view->btn_noise || !view->label_noise_text) return;
+
+    if (enabled) {
+        lv_label_set_text(view->label_noise_text, "N:ON");
+        lv_obj_set_style_bg_color(view->btn_noise, lv_color_hex(0xd4aa00), 0);
+    } else {
+        lv_label_set_text(view->label_noise_text, "N:OFF");
+        lv_obj_set_style_bg_color(view->btn_noise, lv_color_hex(0x555555), 0);
+    }
+}
+
+void reconstruction_viewer_view_set_noise_level(reconstruction_viewer_view_t *view, int32_t pct)
+{
+    if (!view || !view->label_noise_pct) return;
+
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%ld%%", (long)pct);
+    lv_label_set_text(view->label_noise_pct, buf);
 }

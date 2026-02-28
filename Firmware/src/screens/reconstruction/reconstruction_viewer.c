@@ -19,6 +19,8 @@ void reconstruction_viewer_create(const char *filename)
     bindings.on_return = reconstruction_viewer_presenter_on_return;
     bindings.on_save = reconstruction_viewer_presenter_on_save;
     bindings.on_play_pause = reconstruction_viewer_presenter_on_play_pause;
+    bindings.on_noise_toggle = reconstruction_viewer_presenter_on_noise_toggle;
+    bindings.on_noise_level = reconstruction_viewer_presenter_on_noise_level;
 
     reconstruction_viewer_view_create(&s_view, lv_screen_active(), &bindings);
     reconstruction_viewer_presenter_on_create(&s_presenter, filename);

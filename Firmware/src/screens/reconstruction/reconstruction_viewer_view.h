@@ -12,12 +12,16 @@ extern "C" {
 typedef void (*recon_view_on_return_cb_t)(void *ctx);
 typedef void (*recon_view_on_save_cb_t)(void *ctx);
 typedef void (*recon_view_on_play_pause_cb_t)(void *ctx);
+typedef void (*recon_view_on_noise_toggle_cb_t)(void *ctx);
+typedef void (*recon_view_on_noise_level_cb_t)(void *ctx, int32_t level);
 
 typedef struct {
     void *ctx;
     recon_view_on_return_cb_t on_return;
     recon_view_on_save_cb_t on_save;
     recon_view_on_play_pause_cb_t on_play_pause;
+    recon_view_on_noise_toggle_cb_t on_noise_toggle;
+    recon_view_on_noise_level_cb_t on_noise_level;
 } reconstruction_view_bindings_t;
 
 typedef struct {
@@ -29,6 +33,10 @@ typedef struct {
     lv_obj_t *btn_save;
     lv_obj_t *btn_play_pause;
     lv_obj_t *label_play_pause_text;
+    lv_obj_t *btn_noise;
+    lv_obj_t *label_noise_text;
+    lv_obj_t *slider_noise;
+    lv_obj_t *label_noise_pct;
 
     reconstruction_view_bindings_t bindings;
 } reconstruction_viewer_view_t;
@@ -46,6 +54,12 @@ void reconstruction_viewer_view_set_fps(reconstruction_viewer_view_t *view, uint
 
 /* Update play/pause button visual state (1 = playing, 0 = paused). */
 void reconstruction_viewer_view_set_play_state(reconstruction_viewer_view_t *view, int playing);
+
+/* Update noise button visual state (1 = noise ON, 0 = OFF). */
+void reconstruction_viewer_view_set_noise_state(reconstruction_viewer_view_t *view, int enabled);
+
+/* Update noise percentage label from slider value. */
+void reconstruction_viewer_view_set_noise_level(reconstruction_viewer_view_t *view, int32_t pct);
 
 #ifdef __cplusplus
 }

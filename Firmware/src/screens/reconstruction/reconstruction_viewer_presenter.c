@@ -1,11 +1,10 @@
 #include "reconstruction_viewer_presenter.h"
 
 #include "app/app_coordinator.h"
-#include "services/dataset_service.h"
+#include "services/eit_acq_simulated.h"
 
 #include <string.h>
 #include <stdio.h>
-#include <math.h>
 
 #define DISPLAY_SIZE 288
 
@@ -28,16 +27,14 @@ static void presenter_cleanup(reconstruction_viewer_presenter_t *p)
         p->recon_result = NULL;
     }
 
-    if (p->ref_uel) {
-        dataset_service_free_uel_2d(p->ref_uel);
-        p->ref_uel = NULL;
+    /* Destroy acquisition backend (frees all loaded data) */
+    if (p->acq_backend) {
+        eit_acquisition_deinit();
+        eit_acq_simulated_destroy(p->acq_backend);
+        p->acq_backend = NULL;
     }
 
-    if (p->target_uel) {
-        dataset_service_free_uel_2d(p->target_uel);
-        p->target_uel = NULL;
-    }
-
+    memset(&p->ref_frame, 0, sizeof(p->ref_frame));
     p->is_playing = 0;
 }
 
@@ -242,35 +239,55 @@ static void save_start_async_cb(void *user_data)
 static void acq_timer_cb(lv_timer_t *t)
 {
     reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)lv_timer_get_user_data(t);
-    if (!p || !p->view || !p->ref_uel || !p->target_uel) return;
+    if (!p || !p->view || !p->acq_backend) return;
 
-    /* Free previous result (image_data is heap, color_buffer is SDRAM) */
-    if (p->recon_result) {
-        lbp_free_result(p->recon_result);
-        p->recon_result = NULL;
+    eit_acq_status_t status = eit_acquisition_poll();
+
+    switch (status.state) {
+    case EIT_ACQ_INJECTING:
+    case EIT_ACQ_MEASURING:
+        return;  /* Wait for frame to complete */
+
+    case EIT_ACQ_FRAME_READY: {
+        eit_frame_t frame;
+        if (!eit_acquisition_get_frame(&frame)) return;
+
+        /* Free previous result */
+        if (p->recon_result) {
+            lbp_free_result(p->recon_result);
+            p->recon_result = NULL;
+        }
+
+        /* Reconstruct: delta_v = target - reference */
+        p->recon_result = lbp_reconstruct(p->ref_frame.uel, frame.uel,
+                                           p->acq_n_meas, p->acq_n_inj);
+
+        if (p->recon_result && p->recon_result->success) {
+            reconstruction_viewer_view_render_rgb565(
+                p->view,
+                p->recon_result->color_buffer,
+                p->recon_result->display_size,
+                p->recon_result->display_size);
+        }
+
+        /* FPS tracking — update every second */
+        p->frame_count++;
+        uint32_t now = lv_tick_get();
+        uint32_t elapsed = now - p->fps_tick_start;
+        if (elapsed >= 1000u) {
+            uint32_t fps_x10 = (p->frame_count * 10000u) / elapsed;
+            reconstruction_viewer_view_set_fps(p->view, fps_x10);
+            p->frame_count = 0;
+            p->fps_tick_start = now;
+        }
+
+        /* Start next acquisition cycle */
+        eit_acquisition_start_frame();
+        return;
     }
 
-    /* Reconstruct */
-    p->recon_result = lbp_reconstruct(p->ref_uel[0], p->target_uel[0],
-                                       p->acq_n_meas, p->acq_n_inj);
-
-    if (!p->recon_result || !p->recon_result->success) return;
-
-    /* Render to canvas */
-    reconstruction_viewer_view_render_rgb565(p->view,
-                                             p->recon_result->color_buffer,
-                                             p->recon_result->display_size,
-                                             p->recon_result->display_size);
-
-    /* FPS tracking — update every second */
-    p->frame_count++;
-    uint32_t now = lv_tick_get();
-    uint32_t elapsed = now - p->fps_tick_start;
-    if (elapsed >= 1000u) {
-        uint32_t fps_x10 = (p->frame_count * 10000u) / elapsed;
-        reconstruction_viewer_view_set_fps(p->view, fps_x10);
-        p->frame_count = 0;
-        p->fps_tick_start = now;
+    default:
+        return;
     }
 }
 
@@ -283,6 +300,8 @@ void reconstruction_viewer_presenter_init(reconstruction_viewer_presenter_t *pre
 
     presenter->view = view;
     presenter->save_last_res = FR_OK;
+    presenter->noise_enabled = 0;
+    presenter->noise_level_pct = 10;
 }
 
 void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t *presenter, const char *filename)
@@ -294,84 +313,73 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
 
     reconstruction_viewer_view_set_title(presenter->view, filename);
     reconstruction_viewer_view_set_save_enabled(presenter->view, 0);
-    reconstruction_viewer_view_set_status(presenter->view, "Loading reference data...");
+    reconstruction_viewer_view_set_status(presenter->view, "Initializing acquisition...");
 
-    uint16_t ref_n_meas = 0, ref_n_inj = 0;
-    presenter->ref_uel = dataset_service_load_uel_2d("datamat_1_0.bin", &ref_n_meas, &ref_n_inj);
-    if (!presenter->ref_uel) {
-        reconstruction_viewer_view_set_status(presenter->view, "ERROR: Reference file datamat_1_0.bin not found on SD card");
+    /* ---- Create simulated acquisition backend ---- */
+    presenter->acq_backend = eit_acq_simulated_create("datamat_1_0.bin", filename);
+    if (!presenter->acq_backend) {
+        reconstruction_viewer_view_set_status(presenter->view,
+            "ERROR: Failed to load reference or target data from SD");
         return;
     }
 
-    reconstruction_viewer_view_set_status(presenter->view, "Loading target data...");
+    eit_acquisition_init(presenter->acq_backend);
 
-    uint16_t tgt_n_meas = 0, tgt_n_inj = 0;
-    presenter->target_uel = dataset_service_load_uel_2d(filename, &tgt_n_meas, &tgt_n_inj);
-    if (!presenter->target_uel) {
-        dataset_service_free_uel_2d(presenter->ref_uel);
-        presenter->ref_uel = NULL;
-        char err[128];
-        snprintf(err, sizeof(err), "ERROR: Failed to load target file %s", filename);
-        reconstruction_viewer_view_set_status(presenter->view, err);
+    /* Apply current noise settings to backend */
+    eit_acq_simulated_set_noise(presenter->acq_backend,
+                                 presenter->noise_enabled,
+                                 presenter->noise_level_pct);
+
+    /* Get reference frame (immediate, no acquisition delay) */
+    if (!eit_acquisition_get_ref_frame(&presenter->ref_frame)) {
+        reconstruction_viewer_view_set_status(presenter->view,
+            "ERROR: Failed to get reference frame");
+        eit_acquisition_deinit();
+        eit_acq_simulated_destroy(presenter->acq_backend);
+        presenter->acq_backend = NULL;
         return;
     }
 
-    if (ref_n_meas != tgt_n_meas || ref_n_inj != tgt_n_inj) {
-        dataset_service_free_uel_2d(presenter->ref_uel);
-        presenter->ref_uel = NULL;
-        dataset_service_free_uel_2d(presenter->target_uel);
-        presenter->target_uel = NULL;
-        char err[128];
-        snprintf(err, sizeof(err), "ERROR: Dimension mismatch ref[%dx%d] vs tgt[%dx%d]",
-                 (int)ref_n_meas, (int)ref_n_inj, (int)tgt_n_meas, (int)tgt_n_inj);
-        reconstruction_viewer_view_set_status(presenter->view, err);
-        return;
-    }
+    presenter->acq_n_meas = presenter->ref_frame.n_meas;
+    presenter->acq_n_inj  = presenter->ref_frame.n_inj;
 
-    presenter->acq_n_meas = ref_n_meas;
-    presenter->acq_n_inj = ref_n_inj;
-
-    reconstruction_viewer_view_set_status(presenter->view, "Performing reconstruction...");
-
+    /* Initialize LBP if needed */
     if (!lbp_get_matrix_info()) {
-        reconstruction_viewer_view_set_status(presenter->view, "Initializing LBP (loading sensitivity matrix)...");
+        reconstruction_viewer_view_set_status(presenter->view, "Loading sensitivity matrix...");
 
         if (!lbp_init()) {
-            dataset_service_free_uel_2d(presenter->ref_uel);
-            presenter->ref_uel = NULL;
-            dataset_service_free_uel_2d(presenter->target_uel);
-            presenter->target_uel = NULL;
-            reconstruction_viewer_view_set_status(presenter->view, "ERROR: Failed to load sensitivity_matrix.bin from SD card");
+            eit_acquisition_deinit();
+            eit_acq_simulated_destroy(presenter->acq_backend);
+            presenter->acq_backend = NULL;
+            reconstruction_viewer_view_set_status(presenter->view,
+                "ERROR: Failed to load sensitivity_matrix.bin from SD card");
             return;
         }
     }
 
-    presenter->recon_result = lbp_reconstruct(presenter->ref_uel[0], presenter->target_uel[0],
-                                               presenter->acq_n_meas, presenter->acq_n_inj);
+    /* Get initial frame for immediate display (first get_frame works without start_frame) */
+    reconstruction_viewer_view_set_status(presenter->view, "First reconstruction...");
 
-    if (!presenter->recon_result || !presenter->recon_result->success) {
-        char err[256];
-        if (presenter->recon_result) {
-            snprintf(err, sizeof(err), "RECON ERROR: %s", presenter->recon_result->error_msg);
-        } else {
-            snprintf(err, sizeof(err), "RECON ERROR: lbp_init not called or sensitivity_matrix.bin missing");
+    eit_frame_t first_frame;
+    if (eit_acquisition_get_frame(&first_frame)) {
+        presenter->recon_result = lbp_reconstruct(presenter->ref_frame.uel, first_frame.uel,
+                                                   presenter->acq_n_meas, presenter->acq_n_inj);
+
+        if (presenter->recon_result && presenter->recon_result->success) {
+            reconstruction_viewer_view_render_rgb565(presenter->view,
+                                                    presenter->recon_result->color_buffer,
+                                                    presenter->recon_result->display_size,
+                                                    presenter->recon_result->display_size);
+
+            char status[128];
+            int32_t vmin_int = (int32_t)(presenter->recon_result->vmin * 1000000);
+            int32_t vmax_int = (int32_t)(presenter->recon_result->vmax * 1000000);
+            snprintf(status, sizeof(status), "Range: [%ld.%lduV, %ld.%lduV]",
+                     (long)(vmin_int / 1000000), (long)((vmin_int / 1000) % 1000),
+                     (long)(vmax_int / 1000000), (long)((vmax_int / 1000) % 1000));
+            reconstruction_viewer_view_set_status(presenter->view, status);
         }
-        reconstruction_viewer_view_set_status(presenter->view, err);
-        return;
     }
-
-    reconstruction_viewer_view_render_rgb565(presenter->view,
-                                            presenter->recon_result->color_buffer,
-                                            presenter->recon_result->display_size,
-                                            presenter->recon_result->display_size);
-
-    char status[128];
-    int32_t vmin_int = (int32_t)(presenter->recon_result->vmin * 1000000);
-    int32_t vmax_int = (int32_t)(presenter->recon_result->vmax * 1000000);
-    snprintf(status, sizeof(status), "Range: [%ld.%lduV, %ld.%lduV]",
-             (long)(vmin_int / 1000000), (long)((vmin_int / 1000) % 1000),
-             (long)(vmax_int / 1000000), (long)((vmax_int / 1000) % 1000));
-    reconstruction_viewer_view_set_status(presenter->view, status);
 
     reconstruction_viewer_view_set_save_enabled(presenter->view, 1);
 
@@ -410,17 +418,44 @@ void reconstruction_viewer_presenter_on_save(void *ctx)
 void reconstruction_viewer_presenter_on_play_pause(void *ctx)
 {
     reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
-    if (!p || !p->acq_timer) return;
+    if (!p || !p->acq_timer || !p->acq_backend) return;
 
     p->is_playing = !p->is_playing;
 
     if (p->is_playing) {
         p->frame_count = 0;
         p->fps_tick_start = lv_tick_get();
+        eit_acquisition_start_frame();
         lv_timer_resume(p->acq_timer);
     } else {
         lv_timer_pause(p->acq_timer);
     }
 
     reconstruction_viewer_view_set_play_state(p->view, p->is_playing);
+}
+
+void reconstruction_viewer_presenter_on_noise_toggle(void *ctx)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
+    if (!p) return;
+
+    p->noise_enabled = !p->noise_enabled;
+    if (p->acq_backend) {
+        eit_acq_simulated_set_noise(p->acq_backend, p->noise_enabled, p->noise_level_pct);
+    }
+    reconstruction_viewer_view_set_noise_state(p->view, p->noise_enabled);
+}
+
+void reconstruction_viewer_presenter_on_noise_level(void *ctx, int32_t level)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
+    if (!p) return;
+
+    if (level < 0) level = 0;
+    if (level > 100) level = 100;
+    p->noise_level_pct = level;
+    if (p->acq_backend) {
+        eit_acq_simulated_set_noise(p->acq_backend, p->noise_enabled, p->noise_level_pct);
+    }
+    reconstruction_viewer_view_set_noise_level(p->view, level);
 }

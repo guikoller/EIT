@@ -4,6 +4,7 @@
 #include "reconstruction_viewer_view.h"
 
 #include "algorithms/lbp_reconstruction.h"
+#include "services/eit_acquisition.h"
 
 #include "ff.h"
 
@@ -19,15 +20,21 @@ typedef struct {
     char current_filename[128];
     ReconstructionResult *recon_result;
 
-    /* Continuous acquisition loop */
-    lv_timer_t *acq_timer;
-    float **ref_uel;
-    float **target_uel;
+    /* Data acquisition (hardware abstraction layer) */
+    eit_acq_backend_t *acq_backend;
+    eit_frame_t ref_frame;      /* Stored reference for LBP */
     uint16_t acq_n_meas;
     uint16_t acq_n_inj;
+
+    /* Continuous display loop */
+    lv_timer_t *acq_timer;
     uint32_t frame_count;
     uint32_t fps_tick_start;
     int is_playing;
+
+    /* Noise injection (UI state — forwarded to backend) */
+    int noise_enabled;
+    int32_t noise_level_pct;
 
     lv_timer_t *save_timer;
     FIL save_file;
@@ -44,6 +51,8 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
 void reconstruction_viewer_presenter_on_return(void *ctx);
 void reconstruction_viewer_presenter_on_save(void *ctx);
 void reconstruction_viewer_presenter_on_play_pause(void *ctx);
+void reconstruction_viewer_presenter_on_noise_toggle(void *ctx);
+void reconstruction_viewer_presenter_on_noise_level(void *ctx, int32_t level);
 
 #ifdef __cplusplus
 }
