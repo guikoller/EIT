@@ -69,6 +69,13 @@ static void datatable_changed(lv_event_t *e)
         v->bindings.on_show_data_table(v->bindings.ctx, checked);
 }
 
+static void calibrate_clicked(lv_event_t *e)
+{
+    settings_view_t *v = (settings_view_t *)lv_event_get_user_data(e);
+    if (v && v->bindings.on_calibrate)
+        v->bindings.on_calibrate(v->bindings.ctx);
+}
+
 /* ---- Helper: section label ---- */
 static lv_obj_t *make_section_label(lv_obj_t *parent, const char *text,
                                     lv_align_t align, int x, int y)
@@ -106,7 +113,7 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
 
     /* ---- Card area ---- */
     lv_obj_t *card = lv_obj_create(view->cont);
-    lv_obj_set_size(card, 700, 340);
+    lv_obj_set_size(card, 700, 400);
     lv_obj_align(card, LV_ALIGN_CENTER, 0, 5);
     lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
     lv_obj_set_style_border_color(card, lv_color_hex(0x3a3a3a), 0);
@@ -175,6 +182,36 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     lv_obj_set_style_min_height(view->cb_data_table, 40, LV_PART_INDICATOR);
     lv_obj_add_event_cb(view->cb_data_table, datatable_changed, LV_EVENT_VALUE_CHANGED, view);
 
+    /* ---- Row 4: Calibrate ---- */
+    lv_obj_t *row4 = lv_obj_create(card);
+    lv_obj_set_size(row4, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_min_height(row4, 60, 0);
+    lv_obj_set_style_bg_opa(row4, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row4, 0, 0);
+    lv_obj_set_style_pad_all(row4, 0, 0);
+
+    make_section_label(row4, "Calibrate", LV_ALIGN_LEFT_MID, 0, 0);
+
+    view->btn_calibrate = lv_button_create(row4);
+    lv_obj_set_size(view->btn_calibrate, 280, 50);
+    lv_obj_align(view->btn_calibrate, LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_set_style_bg_color(view->btn_calibrate, lv_color_hex(COL_BTN), 0);
+    lv_obj_set_style_radius(view->btn_calibrate, 8, 0);
+    lv_obj_add_event_cb(view->btn_calibrate, calibrate_clicked, LV_EVENT_CLICKED, view);
+
+    lv_obj_t *cal_lbl = lv_label_create(view->btn_calibrate);
+    lv_label_set_text(cal_lbl, LV_SYMBOL_REFRESH "  CALIBRATE");
+    lv_obj_set_style_text_color(cal_lbl, lv_color_white(), 0);
+    lv_obj_set_style_text_font(cal_lbl, &lv_font_montserrat_22, 0);
+    lv_obj_center(cal_lbl);
+
+    /* Calibration status label (below card, above back button) */
+    view->label_calib_status = lv_label_create(view->cont);
+    lv_label_set_text(view->label_calib_status, "");
+    lv_obj_set_style_text_color(view->label_calib_status, lv_color_hex(COL_ACCENT), 0);
+    lv_obj_set_style_text_font(view->label_calib_status, &lv_font_montserrat_14, 0);
+    lv_obj_align(view->label_calib_status, LV_ALIGN_BOTTOM_MID, 0, -72);
+
     /* ---- Back button ---- */
     view->btn_back = lv_button_create(view->cont);
     lv_obj_set_size(view->btn_back, 200, 56);
@@ -209,4 +246,19 @@ void settings_view_set_values(settings_view_t *view,
         else
             lv_obj_clear_state(view->cb_data_table, LV_STATE_CHECKED);
     }
+}
+
+void settings_view_set_calib_status(settings_view_t *view, const char *text)
+{
+    if (!view || !view->label_calib_status) return;
+    lv_label_set_text(view->label_calib_status, text ? text : "");
+}
+
+void settings_view_set_calib_enabled(settings_view_t *view, int enabled)
+{
+    if (!view || !view->btn_calibrate) return;
+    if (enabled)
+        lv_obj_clear_state(view->btn_calibrate, LV_STATE_DISABLED);
+    else
+        lv_obj_add_state(view->btn_calibrate, LV_STATE_DISABLED);
 }

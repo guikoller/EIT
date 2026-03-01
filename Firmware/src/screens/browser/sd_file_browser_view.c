@@ -57,19 +57,6 @@ static void load_btn_clicked(lv_event_t *e)
     }
 }
 
-static void compute_sens_matrix_btn_clicked(lv_event_t *e)
-{
-    sd_file_browser_view_t *view = (sd_file_browser_view_t *)lv_event_get_user_data(e);
-    if (!view) return;
-
-    lv_event_code_t code = lv_event_get_code(e);
-    if(code != LV_EVENT_CLICKED) return;
-
-    if (view->bindings.on_compute_sens_matrix) {
-        view->bindings.on_compute_sens_matrix(view->bindings.ctx);
-    }
-}
-
 static void format_size(uint32_t bytes, char *buf, size_t buf_size)
 {
     if(bytes >= 1024u * 1024u)
@@ -125,21 +112,9 @@ void sd_file_browser_view_create(sd_file_browser_view_t *view, lv_obj_t *parent,
     /* Vertically align with the bottom buttons (y=-20, h=50 => center is -45). */
     lv_obj_align(view->label_status, LV_ALIGN_BOTTOM_MID, 0, -45);
 
-    view->btn_compute_sens_matrix = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_compute_sens_matrix, 180, 50);
-    lv_obj_align(view->btn_compute_sens_matrix, LV_ALIGN_BOTTOM_LEFT, 25, -20);
-    lv_obj_set_style_bg_color(view->btn_compute_sens_matrix, lv_color_hex(0x2a7da8), 0);
-    lv_obj_set_style_radius(view->btn_compute_sens_matrix, 5, 0);
-    lv_obj_add_event_cb(view->btn_compute_sens_matrix, compute_sens_matrix_btn_clicked, LV_EVENT_CLICKED, view);
-
-    lv_obj_t *btn_cal_label = lv_label_create(view->btn_compute_sens_matrix);
-    lv_label_set_text(btn_cal_label, "CALIBRATE");
-    lv_obj_set_style_text_color(btn_cal_label, lv_color_white(), 0);
-    lv_obj_center(btn_cal_label);
-
     view->btn_load = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_load, 180, 50);
-    lv_obj_align(view->btn_load, LV_ALIGN_BOTTOM_RIGHT, -25, -20);
+    lv_obj_set_size(view->btn_load, 220, 50);
+    lv_obj_align(view->btn_load, LV_ALIGN_BOTTOM_MID, 0, -20);
     lv_obj_set_style_bg_color(view->btn_load, lv_color_hex(0x2a7da8), 0);
     lv_obj_set_style_radius(view->btn_load, 5, 0);
     lv_obj_add_event_cb(view->btn_load, load_btn_clicked, LV_EVENT_CLICKED, view);
@@ -160,10 +135,6 @@ void sd_file_browser_view_set_enabled(sd_file_browser_view_t *view, int enabled)
     if (view->btn_load) {
         if (enabled) lv_obj_clear_state(view->btn_load, LV_STATE_DISABLED);
         else lv_obj_add_state(view->btn_load, LV_STATE_DISABLED);
-    }
-    if (view->btn_compute_sens_matrix) {
-        if (enabled) lv_obj_clear_state(view->btn_compute_sens_matrix, LV_STATE_DISABLED);
-        else lv_obj_add_state(view->btn_compute_sens_matrix, LV_STATE_DISABLED);
     }
     if (view->file_list) {
         if (enabled) lv_obj_clear_state(view->file_list, LV_STATE_DISABLED);

@@ -72,7 +72,21 @@ typedef enum {
 #define EIT_ALGO_DEFAULT        EIT_ALGO_LBP
 
 /** Default "show data table" flag (1 = show, 0 = hide). */
-#define EIT_SHOW_DATA_TABLE_DEFAULT  1
+#define EIT_SHOW_DATA_TABLE_DEFAULT  0
+
+/* ------------------------------------------------------------------ */
+/*  Touch-screen calibration                                           */
+/*  Positive TOUCH_Y_OFFSET shifts the reported touch point UP         */
+/*  (subtract from raw Y).  Adjust if buttons require tapping          */
+/*  above/below their visual position.                                 */
+/* ------------------------------------------------------------------ */
+/** Y-axis pixel offset applied to every touch coordinate.
+ *  Increase if you must tap above a button; decrease (or negate)
+ *  if you must tap below. */
+#define EIT_TOUCH_Y_OFFSET      30
+
+/** X-axis pixel offset (usually 0). */
+#define EIT_TOUCH_X_OFFSET      0
 
 /* ------------------------------------------------------------------ */
 /*  File browser                                                       */

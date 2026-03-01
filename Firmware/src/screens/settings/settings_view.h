@@ -19,6 +19,7 @@ typedef struct {
     settings_algo_cb_t  on_algorithm;
     settings_imgsize_cb_t on_image_size;
     settings_bool_cb_t  on_show_data_table;
+    settings_cb_t       on_calibrate;
 } settings_view_bindings_t;
 
 typedef struct {
@@ -34,6 +35,10 @@ typedef struct {
     /* Show data-table checkbox */
     lv_obj_t *cb_data_table;
 
+    /* Calibrate button + status */
+    lv_obj_t *btn_calibrate;
+    lv_obj_t *label_calib_status;
+
     /* Back button */
     lv_obj_t *btn_back;
 
@@ -48,6 +53,12 @@ void settings_view_set_values(settings_view_t *view,
                               eit_algorithm_t algo,
                               uint16_t image_size,
                               uint8_t show_data_table);
+
+/** Update the calibration status text shown below the card. */
+void settings_view_set_calib_status(settings_view_t *view, const char *text);
+
+/** Enable / disable the calibrate button. */
+void settings_view_set_calib_enabled(settings_view_t *view, int enabled);
 
 #ifdef __cplusplus
 }

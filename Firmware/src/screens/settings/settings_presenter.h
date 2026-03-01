@@ -10,6 +10,9 @@ extern "C" {
 
 typedef struct {
     settings_view_t *view;
+
+    lv_timer_t *calib_timer;
+    uint8_t     calib_start_pending;
 } settings_presenter_t;
 
 void settings_presenter_init(settings_presenter_t *p, settings_view_t *v);
@@ -20,6 +23,7 @@ void settings_presenter_on_back(void *ctx);
 void settings_presenter_on_algorithm(void *ctx, eit_algorithm_t algo);
 void settings_presenter_on_image_size(void *ctx, uint16_t size);
 void settings_presenter_on_show_data_table(void *ctx, uint8_t value);
+void settings_presenter_on_calibrate(void *ctx);
 
 #ifdef __cplusplus
 }

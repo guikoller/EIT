@@ -83,7 +83,7 @@ static lv_obj_t *build_about_overlay(lv_obj_t *parent, home_view_t *view)
         "Electrical Impedance Tomography\n\n"
         "STM32F769I-DISCO + LVGL v9\n"
         "LBP Reconstruction Algorithm\n\n"
-        "Developed by G. Kolotouros");
+        "Developed by Guilherme Koller");
     lv_obj_set_style_text_color(body, lv_color_white(), 0);
     lv_obj_set_style_text_font(body, &lv_font_montserrat_14, 0);
     lv_obj_set_width(body, 440);
