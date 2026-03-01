@@ -6,30 +6,31 @@
 #include <stdio.h>
 #include <math.h>
 
-#define DISPLAY_SIZE  EIT_DISPLAY_SIZE
-#define NUM_ELEC      EIT_NUM_ELECTRODES
-#define PI_F          3.14159265f
+#define DISPLAY_SIZE_MAX  EIT_DISPLAY_SIZE_MAX
+#define NUM_ELEC          EIT_NUM_ELECTRODES
+#define PI_F              3.14159265f
 
-/* ---- Pre-computed overlay mask (computed once, applied every frame) ---- */
-/* Bitmask: 1 bit per pixel, packed into uint32_t words */
-#define OVERLAY_WORDS ((DISPLAY_SIZE * DISPLAY_SIZE + 31u) / 32u)
-static uint32_t s_overlay_mask[OVERLAY_WORDS];
+/* ---- Pre-computed overlay mask (recomputed when display_size changes) ---- */
+/* Bitmask: 1 bit per pixel, packed into uint32_t words (sized for max) */
+#define OVERLAY_WORDS_MAX ((DISPLAY_SIZE_MAX * DISPLAY_SIZE_MAX + 31u) / 32u)
+static uint32_t s_overlay_mask[OVERLAY_WORDS_MAX];
 static int s_overlay_ready = 0;
+static uint32_t s_overlay_size = 0;  /* the display_size the mask was built for */
 
-static void overlay_set_pixel(int x, int y)
+static void overlay_set_pixel(int x, int y, uint32_t dsz)
 {
-    if (x < 0 || x >= DISPLAY_SIZE || y < 0 || y >= DISPLAY_SIZE) return;
-    uint32_t idx = (uint32_t)(y * DISPLAY_SIZE + x);
+    if (x < 0 || x >= (int)dsz || y < 0 || y >= (int)dsz) return;
+    uint32_t idx = (uint32_t)(y * (int)dsz + x);
     s_overlay_mask[idx >> 5] |= (1u << (idx & 31u));
 }
 
-static void precompute_overlay(void)
+static void precompute_overlay(uint32_t dsz)
 {
-    if (s_overlay_ready) return;
+    if (s_overlay_ready && s_overlay_size == dsz) return;
     memset(s_overlay_mask, 0, sizeof(s_overlay_mask));
 
-    const int center = DISPLAY_SIZE / 2;
-    const int radius = DISPLAY_SIZE / 2;
+    const int center = (int)dsz / 2;
+    const int radius = (int)dsz / 2;
 
     /* Circle border — fine angle steps, 3-pixel wide line */
     const int num_steps = 1440;
@@ -38,7 +39,7 @@ static void precompute_overlay(void)
         const float ca = cosf(angle);
         const float sa = sinf(angle);
         for (int r = radius - 3; r <= radius - 1; r++) {
-            overlay_set_pixel(center + (int)(r * ca), center - (int)(r * sa));
+            overlay_set_pixel(center + (int)(r * ca), center - (int)(r * sa), dsz);
         }
     }
 
@@ -53,12 +54,13 @@ static void precompute_overlay(void)
         for (int dy = -dot_r; dy <= dot_r; dy++) {
             for (int dx = -dot_r; dx <= dot_r; dx++) {
                 if (dx * dx + dy * dy <= dot_r * dot_r) {
-                    overlay_set_pixel(ex + dx, ey + dy);
+                    overlay_set_pixel(ex + dx, ey + dy, dsz);
                 }
             }
         }
     }
 
+    s_overlay_size = dsz;
     s_overlay_ready = 1;
 }
 
@@ -125,10 +127,14 @@ static void noise_slider_changed(lv_event_t *e)
 
 static void create_canvas(reconstruction_viewer_view_t *view)
 {
+    uint32_t dsz = view->display_size;
+    if (dsz == 0) dsz = EIT_DISPLAY_SIZE;
+
     view->canvas = lv_canvas_create(view->cont);
 
-    static lv_color_t canvas_buf[DISPLAY_SIZE * DISPLAY_SIZE];
-    lv_canvas_set_buffer(view->canvas, canvas_buf, DISPLAY_SIZE, DISPLAY_SIZE, LV_COLOR_FORMAT_RGB565);
+    /* Canvas pixel buffer lives in SDRAM (sized for the max option) */
+    lv_color_t *canvas_buf = (lv_color_t *)EIT_SDRAM_CANVAS_BUF_ADDR;
+    lv_canvas_set_buffer(view->canvas, canvas_buf, dsz, dsz, LV_COLOR_FORMAT_RGB565);
 
     lv_obj_align(view->canvas, LV_ALIGN_CENTER, -30, 20);
     lv_canvas_fill_bg(view->canvas, lv_color_hex(0x000000), LV_OPA_COVER);
@@ -136,9 +142,10 @@ static void create_canvas(reconstruction_viewer_view_t *view)
 
 static void add_electrode_markers(reconstruction_viewer_view_t *view)
 {
-    const int center_x = DISPLAY_SIZE / 2;
-    const int center_y = DISPLAY_SIZE / 2;
-    const int radius = DISPLAY_SIZE / 2 + 20;
+    const uint32_t dsz = view->display_size ? view->display_size : EIT_DISPLAY_SIZE;
+    const int center_x = (int)dsz / 2;
+    const int center_y = (int)dsz / 2;
+    const int radius = (int)dsz / 2 + 20;
 
     for (int i = 0; i < (int)NUM_ELEC; i++) {
         const float angle = (i * 2.0f * PI_F) / (float)NUM_ELEC;
@@ -167,6 +174,9 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
         memset(&view->bindings, 0, sizeof(view->bindings));
     }
 
+    /* Set default display size (presenter may override via set_display_size) */
+    view->display_size = EIT_DISPLAY_SIZE;
+
     view->cont = lv_obj_create(parent);
     lv_obj_set_size(view->cont, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_style_bg_color(view->cont, lv_color_hex(0x0a0a0a), 0);
@@ -193,13 +203,19 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     lv_obj_set_style_text_font(view->label_fps, &lv_font_montserrat_14, 0);
     lv_obj_align(view->label_fps, LV_ALIGN_TOP_RIGHT, -15, 15);
 
+    view->label_algo = lv_label_create(view->cont);
+    lv_label_set_text(view->label_algo, "");
+    lv_obj_set_style_text_color(view->label_algo, lv_color_hex(0xd4aa00), 0);
+    lv_obj_set_style_text_font(view->label_algo, &lv_font_montserrat_14, 0);
+    lv_obj_align(view->label_algo, LV_ALIGN_TOP_LEFT, 15, 15);
+
     create_canvas(view);
     add_electrode_markers(view);
 
     /* ---- Left-side controls (play/pause, noise toggle) ---- */
     view->btn_play_pause = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_play_pause, 60, 50);
-    lv_obj_align(view->btn_play_pause, LV_ALIGN_LEFT_MID, 10, -20);
+    lv_obj_set_size(view->btn_play_pause, 80, 60);
+    lv_obj_align(view->btn_play_pause, LV_ALIGN_LEFT_MID, 10, -25);
     lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0x2a9d2a), 0);
     lv_obj_set_style_radius(view->btn_play_pause, 5, 0);
     lv_obj_add_event_cb(view->btn_play_pause, play_pause_btn_clicked, LV_EVENT_CLICKED, view);
@@ -210,8 +226,8 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     lv_obj_center(view->label_play_pause_text);
 
     view->btn_noise = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_noise, 60, 40);
-    lv_obj_align(view->btn_noise, LV_ALIGN_LEFT_MID, 10, 40);
+    lv_obj_set_size(view->btn_noise, 80, 55);
+    lv_obj_align(view->btn_noise, LV_ALIGN_LEFT_MID, 10, 45);
     lv_obj_set_style_bg_color(view->btn_noise, lv_color_hex(0x555555), 0);
     lv_obj_set_style_radius(view->btn_noise, 5, 0);
     lv_obj_add_event_cb(view->btn_noise, noise_btn_clicked, LV_EVENT_CLICKED, view);
@@ -249,7 +265,7 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
 
     /* ---- Bottom bar: RETURN (left) and SAVE (right) ---- */
     lv_obj_t *btn_return = lv_button_create(view->cont);
-    lv_obj_set_size(btn_return, 160, 45);
+    lv_obj_set_size(btn_return, 200, 55);
     lv_obj_align(btn_return, LV_ALIGN_BOTTOM_LEFT, 15, -10);
     lv_obj_set_style_bg_color(btn_return, lv_color_hex(0x666666), 0);
     lv_obj_set_style_radius(btn_return, 5, 0);
@@ -261,7 +277,7 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     lv_obj_center(label_return);
 
     view->btn_save = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_save, 160, 45);
+    lv_obj_set_size(view->btn_save, 200, 55);
     lv_obj_align(view->btn_save, LV_ALIGN_BOTTOM_RIGHT, -15, -10);
     lv_obj_set_style_bg_color(view->btn_save, lv_color_hex(0x2a7da8), 0);
     lv_obj_set_style_radius(view->btn_save, 5, 0);
@@ -302,20 +318,22 @@ void reconstruction_viewer_view_set_save_enabled(reconstruction_viewer_view_t *v
 void reconstruction_viewer_view_render_rgb565(reconstruction_viewer_view_t *view, const uint16_t *rgb565, uint32_t width, uint32_t height)
 {
     if (!view || !view->canvas || !rgb565) return;
-    if (width != DISPLAY_SIZE || height != DISPLAY_SIZE) return;
+    uint32_t dsz = view->display_size ? view->display_size : EIT_DISPLAY_SIZE;
+    if (width != dsz || height != dsz) return;
 
     lv_color_t *canvas_buf = (lv_color_t *)lv_canvas_get_buf(view->canvas);
     if (!canvas_buf) return;
 
-    memcpy(canvas_buf, rgb565, DISPLAY_SIZE * DISPLAY_SIZE * sizeof(uint16_t));
+    memcpy(canvas_buf, rgb565, dsz * dsz * sizeof(uint16_t));
 
     /* Apply pre-computed overlay mask (fast bit-test loop, no trig) */
-    precompute_overlay();
+    precompute_overlay(dsz);
     uint16_t *buf16 = (uint16_t *)canvas_buf;
     const uint16_t white_color = 0xFFFF;
-    const uint32_t total_pixels = DISPLAY_SIZE * DISPLAY_SIZE;
+    const uint32_t total_pixels = dsz * dsz;
+    const uint32_t overlay_words = (total_pixels + 31u) / 32u;
 
-    for (uint32_t word = 0; word < OVERLAY_WORDS; word++) {
+    for (uint32_t word = 0; word < overlay_words; word++) {
         uint32_t bits = s_overlay_mask[word];
         if (bits == 0) continue;  /* Skip empty words (common case) */
         uint32_t base = word << 5;
@@ -376,4 +394,28 @@ void reconstruction_viewer_view_set_noise_level(reconstruction_viewer_view_t *vi
     char buf[16];
     snprintf(buf, sizeof(buf), "%ld%%", (long)pct);
     lv_label_set_text(view->label_noise_pct, buf);
+}
+
+void reconstruction_viewer_view_set_algorithm(reconstruction_viewer_view_t *view, const char *name)
+{
+    if (!view || !view->label_algo) return;
+    lv_label_set_text(view->label_algo, name ? name : "");
+}
+
+void reconstruction_viewer_view_set_display_size(reconstruction_viewer_view_t *view, uint32_t new_size)
+{
+    if (!view || !view->canvas) return;
+    if (new_size == 0 || new_size > EIT_DISPLAY_SIZE_MAX) new_size = EIT_DISPLAY_SIZE;
+    if (new_size == view->display_size) return;
+
+    view->display_size = new_size;
+
+    /* Recreate canvas at the new size (reuses SDRAM buffer) */
+    lv_color_t *canvas_buf = (lv_color_t *)EIT_SDRAM_CANVAS_BUF_ADDR;
+    lv_canvas_set_buffer(view->canvas, canvas_buf, new_size, new_size, LV_COLOR_FORMAT_RGB565);
+    lv_canvas_fill_bg(view->canvas, lv_color_hex(0x000000), LV_OPA_COVER);
+    lv_obj_align(view->canvas, LV_ALIGN_CENTER, -30, 20);
+
+    /* Force overlay recomputation */
+    s_overlay_ready = 0;
 }

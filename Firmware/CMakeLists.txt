@@ -100,6 +100,7 @@ add_executable(${PROJECT_NAME}
     src/screens/reconstruction/reconstruction_viewer_view.c
     src/screens/reconstruction/reconstruction_viewer_presenter.c
     src/algorithms/lbp_reconstruction.c
+    src/algorithms/dbar_reconstruction.c
     src/stm32f7xx_it.c
     src/syscalls.c
     src/system_stm32f7xx.c

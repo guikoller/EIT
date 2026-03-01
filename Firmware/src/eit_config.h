@@ -31,8 +31,23 @@
 /* ------------------------------------------------------------------ */
 /*  Display                                                            */
 /* ------------------------------------------------------------------ */
-/** Side-length of the upscaled square image shown on screen (pixels). */
+/** Default side-length of the upscaled square image shown on screen. */
 #define EIT_DISPLAY_SIZE        288u
+
+/** Maximum display size (largest setting option, used for buffer alloc). */
+#define EIT_DISPLAY_SIZE_MAX    384u
+
+/** Map the image-size setting (16/32/64) to an on-screen display size
+ *  that is an integer multiple of the reconstruction grid (32).       */
+static inline uint32_t eit_display_size_for_setting(uint16_t image_size)
+{
+    switch (image_size) {
+    case 16: return 192u;   /* 32 × 6  */
+    case 64: return 384u;   /* 32 × 12 */
+    case 32:                /* 32 × 9  */
+    default: return 288u;
+    }
+}
 
 /* ------------------------------------------------------------------ */
 /*  Noise injection defaults                                           */
@@ -59,12 +74,20 @@
  *  matrix generation. */
 #define EIT_SDRAM_ELEC_FIELD_ADDR   ((uint32_t)0xC0A00000u)
 
+/** D-bar algorithm working memory (~20 KB). */
+#define EIT_SDRAM_DBAR_WORK_ADDR    ((uint32_t)0xC0B00000u)
+
+/** LVGL canvas pixel buffer for reconstruction view.
+ *  Sized for EIT_DISPLAY_SIZE_MAX² × 2 = 295 KB.                     */
+#define EIT_SDRAM_CANVAS_BUF_ADDR   ((uint32_t)0xC0B10000u)
+
 /* ------------------------------------------------------------------ */
 /*  Algorithm selection                                                */
 /* ------------------------------------------------------------------ */
 typedef enum {
     EIT_ALGO_LBP = 0,
-    /* future: EIT_ALGO_GREIT, EIT_ALGO_DBAR, ... */
+    EIT_ALGO_DBAR,
+    /* future: EIT_ALGO_GREIT, ... */
     EIT_ALGO_COUNT
 } eit_algorithm_t;
 
@@ -83,7 +106,7 @@ typedef enum {
 /** Y-axis pixel offset applied to every touch coordinate.
  *  Increase if you must tap above a button; decrease (or negate)
  *  if you must tap below. */
-#define EIT_TOUCH_Y_OFFSET      30
+#define EIT_TOUCH_Y_OFFSET      20
 
 /** X-axis pixel offset (usually 0). */
 #define EIT_TOUCH_X_OFFSET      0

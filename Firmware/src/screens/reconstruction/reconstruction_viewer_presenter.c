@@ -2,12 +2,14 @@
 
 #include "app/app_coordinator.h"
 #include "services/eit_acq_simulated.h"
+#include "algorithms/dbar_reconstruction.h"
 #include "eit_config.h"
 
 #include <string.h>
 #include <stdio.h>
 
 #define DISPLAY_SIZE  EIT_DISPLAY_SIZE
+#define DISPLAY_SIZE_MAX  EIT_DISPLAY_SIZE_MAX
 
 static void presenter_cleanup(reconstruction_viewer_presenter_t *p)
 {
@@ -101,9 +103,9 @@ static void save_timer_cb(lv_timer_t *t)
         return;
     }
 
-    static uint8_t rowbuf[DISPLAY_SIZE * 3u];
-    const uint32_t width = DISPLAY_SIZE;
-    const uint32_t height = DISPLAY_SIZE;
+    static uint8_t rowbuf[DISPLAY_SIZE_MAX * 3u];
+    const uint32_t width = p->recon_result->display_size;
+    const uint32_t height = p->recon_result->display_size;
     const uint32_t rows_per_tick = 2u;
 
     for (uint32_t r = 0; r < rows_per_tick && p->save_row < height; r++) {
@@ -189,8 +191,8 @@ static void save_start_async_cb(void *user_data)
         return;
     }
 
-    const uint32_t width = DISPLAY_SIZE;
-    const uint32_t height = DISPLAY_SIZE;
+    const uint32_t width = p->recon_result->display_size;
+    const uint32_t height = p->recon_result->display_size;
     const uint32_t row_bytes = width * 3u;
     const uint32_t pixel_bytes = row_bytes * height;
     const uint32_t file_size = 54u + pixel_bytes;
@@ -234,6 +236,21 @@ static void save_start_async_cb(void *user_data)
     p->save_timer = lv_timer_create(save_timer_cb, 10, p);
 }
 
+/* ---------- Algorithm dispatch helper ---------- */
+static ReconstructionResult *dispatch_reconstruct(
+    const float *ref_uel, const float *target_uel,
+    uint16_t n_meas, uint16_t n_inj)
+{
+    const app_state_t *st = app_coordinator_get_state();
+    switch (st->settings.algorithm) {
+    case EIT_ALGO_DBAR:
+        return dbar_reconstruct(ref_uel, target_uel, n_meas, n_inj);
+    case EIT_ALGO_LBP:
+    default:
+        return lbp_reconstruct(ref_uel, target_uel, n_meas, n_inj);
+    }
+}
+
 /* ---------- Continuous acquisition timer ---------- */
 static void acq_timer_cb(lv_timer_t *t)
 {
@@ -251,12 +268,8 @@ static void acq_timer_cb(lv_timer_t *t)
         eit_frame_t frame;
         if (!eit_acquisition_get_frame(&frame)) return;
 
-        /* Reconstruct: delta_v = target - reference
-         * lbp_reconstruct uses static buffers — no malloc/free per frame.
-         * Result pointer is valid until next lbp_reconstruct() call.
-         */
-        p->recon_result = lbp_reconstruct(p->ref_frame.uel, frame.uel,
-                                           p->acq_n_meas, p->acq_n_inj);
+        p->recon_result = dispatch_reconstruct(p->ref_frame.uel, frame.uel,
+                                               p->acq_n_meas, p->acq_n_inj);
 
         if (p->recon_result && p->recon_result->success) {
             reconstruction_viewer_view_render_rgb565(
@@ -311,6 +324,18 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
     reconstruction_viewer_view_set_save_enabled(presenter->view, 0);
     reconstruction_viewer_view_set_status(presenter->view, "Initializing acquisition...");
 
+    /* Show which algorithm is active */
+    {
+        const app_state_t *st = app_coordinator_get_state();
+        const char *algo_name = "LBP";
+        if (st->settings.algorithm == EIT_ALGO_DBAR) algo_name = "D-Bar";
+        reconstruction_viewer_view_set_algorithm(presenter->view, algo_name);
+
+        /* Apply display size from settings */
+        uint32_t dsz = eit_display_size_for_setting(st->settings.image_size);
+        reconstruction_viewer_view_set_display_size(presenter->view, dsz);
+    }
+
     /* ---- Create simulated acquisition backend ---- */
     presenter->acq_backend = eit_acq_simulated_create("datamat_1_0.bin", filename);
     if (!presenter->acq_backend) {
@@ -353,13 +378,16 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
         }
     }
 
+    /* Initialize D-bar module (reuses the sensitivity matrix from LBP) */
+    dbar_init();
+
     /* Get initial frame for immediate display (first get_frame works without start_frame) */
     reconstruction_viewer_view_set_status(presenter->view, "First reconstruction...");
 
     eit_frame_t first_frame;
     if (eit_acquisition_get_frame(&first_frame)) {
-        presenter->recon_result = lbp_reconstruct(presenter->ref_frame.uel, first_frame.uel,
-                                                   presenter->acq_n_meas, presenter->acq_n_inj);
+        presenter->recon_result = dispatch_reconstruct(presenter->ref_frame.uel, first_frame.uel,
+                                                       presenter->acq_n_meas, presenter->acq_n_inj);
 
         if (presenter->recon_result && presenter->recon_result->success) {
             reconstruction_viewer_view_render_rgb565(presenter->view,

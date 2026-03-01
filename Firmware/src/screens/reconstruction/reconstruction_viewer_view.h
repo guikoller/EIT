@@ -30,6 +30,7 @@ typedef struct {
     lv_obj_t *label_title;
     lv_obj_t *label_status;
     lv_obj_t *label_fps;
+    lv_obj_t *label_algo;
     lv_obj_t *btn_save;
     lv_obj_t *btn_play_pause;
     lv_obj_t *label_play_pause_text;
@@ -37,6 +38,8 @@ typedef struct {
     lv_obj_t *label_noise_text;
     lv_obj_t *slider_noise;
     lv_obj_t *label_noise_pct;
+
+    uint32_t display_size;     /**< runtime display size (192/288/384) */
 
     reconstruction_view_bindings_t bindings;
 } reconstruction_viewer_view_t;
@@ -60,6 +63,12 @@ void reconstruction_viewer_view_set_noise_state(reconstruction_viewer_view_t *vi
 
 /* Update noise percentage label from slider value. */
 void reconstruction_viewer_view_set_noise_level(reconstruction_viewer_view_t *view, int32_t pct);
+
+/* Update algorithm name label. */
+void reconstruction_viewer_view_set_algorithm(reconstruction_viewer_view_t *view, const char *name);
+
+/* Set the display size and rebuild the canvas (call once before first render). */
+void reconstruction_viewer_view_set_display_size(reconstruction_viewer_view_t *view, uint32_t display_size);
 
 #ifdef __cplusplus
 }

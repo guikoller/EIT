@@ -135,7 +135,7 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     make_section_label(row1, "Algorithm", LV_ALIGN_LEFT_MID, 0, 0);
 
     view->dd_algorithm = lv_dropdown_create(row1);
-    lv_dropdown_set_options(view->dd_algorithm, "LBP");
+    lv_dropdown_set_options(view->dd_algorithm, "LBP\nD-Bar");
     lv_obj_set_size(view->dd_algorithm, 280, 50);
     lv_obj_align(view->dd_algorithm, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_set_style_bg_color(view->dd_algorithm, lv_color_hex(0x333333), 0);

@@ -1,4 +1,5 @@
 #include "lbp_reconstruction.h"   /* brings in eit_config.h */
+#include "app/app_coordinator.h"
 #include "ff.h"
 #include "stm32f769i_discovery_sdram.h"
 #include <stdio.h>
@@ -164,15 +165,17 @@ ReconstructionResult* lbp_reconstruct(const float* ref_uel, const float* target_
     result->vmin = -vabs;
     result->vmax = vabs;
     
-    // Pre-upscale to EIT_DISPLAY_SIZE² RGB565 buffer in SDRAM
-    result->display_size = EIT_DISPLAY_SIZE;
-    uint32_t scale = result->display_size / s_header.image_size;
+    // Pre-upscale to RGB565 buffer in SDRAM at runtime display size
+    const app_state_t *app_st = app_coordinator_get_state();
+    uint32_t disp_sz = eit_display_size_for_setting(app_st->settings.image_size);
+    result->display_size = disp_sz;
+    uint32_t scale = disp_sz / s_header.image_size;
     result->color_buffer = (uint16_t*)EIT_SDRAM_COLOR_BUF_ADDR;
     
     uint16_t bg_color = 0x0000;
     
-    for (uint32_t dst_y = 0; dst_y < result->display_size; dst_y++) {
-        for (uint32_t dst_x = 0; dst_x < result->display_size; dst_x++) {
+    for (uint32_t dst_y = 0; dst_y < disp_sz; dst_y++) {
+        for (uint32_t dst_x = 0; dst_x < disp_sz; dst_x++) {
             uint32_t src_x = dst_x / scale;
             uint32_t src_y = dst_y / scale;
             float val = s_image_buf[src_y * s_header.image_size + src_x];
@@ -204,7 +207,7 @@ ReconstructionResult* lbp_reconstruct(const float* ref_uel, const float* target_
                 color = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
             }
             
-            result->color_buffer[dst_y * result->display_size + dst_x] = color;
+            result->color_buffer[dst_y * disp_sz + dst_x] = color;
         }
     }
     
