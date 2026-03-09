@@ -83,7 +83,7 @@ void data_viewer_view_create(data_viewer_view_t *view, lv_obj_t *parent, const d
     lv_obj_align(view->label_title, LV_ALIGN_TOP_MID, 0, 10);
 
     view->tabview = lv_tabview_create(view->cont);
-    lv_obj_set_size(view->tabview, LV_HOR_RES - 20, LV_VER_RES - 100);
+    lv_obj_set_size(view->tabview, LV_HOR_RES - 20, LV_VER_RES - 140);
     lv_obj_align(view->tabview, LV_ALIGN_TOP_MID, 0, 40);
     lv_obj_set_style_bg_color(view->tabview, lv_color_hex(0x0a0a0a), 0);
     lv_tabview_set_tab_bar_position(view->tabview, LV_DIR_TOP);
@@ -112,29 +112,33 @@ void data_viewer_view_create(data_viewer_view_t *view, lv_obj_t *parent, const d
 
     lv_obj_add_event_cb(view->tabview, tab_changed_event_cb, LV_EVENT_VALUE_CHANGED, view);
 
-    lv_obj_t *btn_return = lv_button_create(view->cont);
-    lv_obj_set_size(btn_return, 150, 50);
-    lv_obj_align(btn_return, LV_ALIGN_BOTTOM_LEFT, 25, -10);
-    lv_obj_set_style_bg_color(btn_return, lv_color_hex(0x666666), 0);
-    lv_obj_set_style_radius(btn_return, 5, 0);
-    lv_obj_add_event_cb(btn_return, return_btn_clicked, LV_EVENT_CLICKED, view);
+    view->btn_return = lv_button_create(view->cont);
+    lv_obj_set_size(view->btn_return, 150, 50);
+    lv_obj_align(view->btn_return, LV_ALIGN_BOTTOM_LEFT, 25, -10);
+    lv_obj_set_style_bg_color(view->btn_return, lv_color_hex(0x666666), 0);
+    lv_obj_set_style_radius(view->btn_return, 5, 0);
+    lv_obj_add_event_cb(view->btn_return, return_btn_clicked, LV_EVENT_CLICKED, view);
 
-    lv_obj_t *label_return = lv_label_create(btn_return);
+    lv_obj_t *label_return = lv_label_create(view->btn_return);
     lv_label_set_text(label_return, LV_SYMBOL_LEFT " RETURN");
     lv_obj_set_style_text_color(label_return, lv_color_white(), 0);
     lv_obj_center(label_return);
 
-    lv_obj_t *btn_run = lv_button_create(view->cont);
-    lv_obj_set_size(btn_run, 150, 50);
-    lv_obj_align(btn_run, LV_ALIGN_BOTTOM_RIGHT, -25, -10);
-    lv_obj_set_style_bg_color(btn_run, lv_color_hex(0x2a7da8), 0);
-    lv_obj_set_style_radius(btn_run, 5, 0);
-    lv_obj_add_event_cb(btn_run, run_btn_clicked, LV_EVENT_CLICKED, view);
+    view->btn_run = lv_button_create(view->cont);
+    lv_obj_set_size(view->btn_run, 150, 50);
+    lv_obj_align(view->btn_run, LV_ALIGN_BOTTOM_RIGHT, -25, -10);
+    lv_obj_set_style_bg_color(view->btn_run, lv_color_hex(0x2a7da8), 0);
+    lv_obj_set_style_radius(view->btn_run, 5, 0);
+    lv_obj_add_event_cb(view->btn_run, run_btn_clicked, LV_EVENT_CLICKED, view);
 
-    lv_obj_t *label_run = lv_label_create(btn_run);
+    lv_obj_t *label_run = lv_label_create(view->btn_run);
     lv_label_set_text(label_run, "RUN " LV_SYMBOL_PLAY);
     lv_obj_set_style_text_color(label_run, lv_color_white(), 0);
     lv_obj_center(label_run);
+
+    /* Keep action buttons above tab content so they always receive taps */
+    lv_obj_move_foreground(view->btn_return);
+    lv_obj_move_foreground(view->btn_run);
 }
 
 void data_viewer_view_set_title(data_viewer_view_t *view, const char *filename)

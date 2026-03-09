@@ -3,6 +3,7 @@
 #include "app/app_coordinator.h"
 #include "services/calibration.h"
 #include "services/storage_service.h"
+#include "services/batch_process.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -104,6 +105,10 @@ void settings_presenter_init(settings_presenter_t *p, settings_view_t *v)
         lv_timer_del(p->calib_timer);
         p->calib_timer = NULL;
     }
+    if (p->batch_timer) {
+        lv_timer_del(p->batch_timer);
+        p->batch_timer = NULL;
+    }
     memset(p, 0, sizeof(*p));
     p->view = v;
 }
@@ -163,4 +168,83 @@ void settings_presenter_on_calibrate(void *ctx)
 
     p->calib_start_pending = 1u;
     lv_async_call(compute_sens_matrix_start_async_cb, p);
+}
+
+/* ---- Batch processing helpers ---- */
+
+static void batch_timer_cb(lv_timer_t *t)
+{
+    settings_presenter_t *p = (settings_presenter_t *)lv_timer_get_user_data(t);
+    if (!p || !p->view) return;
+    if (!p->view->label_batch_status ||
+        !lv_obj_is_valid(p->view->label_batch_status)) {
+        if (p->batch_timer == t)
+            p->batch_timer = NULL;
+        lv_timer_del(t);
+        return;
+    }
+
+    batch_progress_t prog;
+    batch_status_t st = batch_process_step(&prog);
+
+    if (st == BATCH_RUNNING) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "BATCH %u/%u  %s",
+                 (unsigned)prog.current, (unsigned)prog.total,
+                 prog.current_file);
+        settings_view_set_batch_status(p->view, msg);
+        return;
+    }
+
+    if (st == BATCH_DONE) {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "BATCH DONE (%u files)",
+                 (unsigned)prog.total);
+        settings_view_set_batch_status(p->view, msg);
+    } else {
+        settings_view_set_batch_status(p->view, "BATCH ERROR");
+    }
+
+    settings_view_set_batch_enabled(p->view, 1);
+    if (p->batch_timer) {
+        lv_timer_del(p->batch_timer);
+        p->batch_timer = NULL;
+    }
+}
+
+static void batch_start_async_cb(void *user_data)
+{
+    settings_presenter_t *p = (settings_presenter_t *)user_data;
+    if (!p || !p->view) return;
+
+    p->batch_start_pending = 0u;
+
+    if (!batch_process_begin()) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "BATCH ERR: %s", batch_process_error());
+        settings_view_set_batch_status(p->view, msg);
+        settings_view_set_batch_enabled(p->view, 1);
+        return;
+    }
+
+    if (p->batch_timer) {
+        lv_timer_del(p->batch_timer);
+        p->batch_timer = NULL;
+    }
+    p->batch_timer = lv_timer_create(batch_timer_cb, 50, p);
+}
+
+void settings_presenter_on_batch(void *ctx)
+{
+    settings_presenter_t *p = (settings_presenter_t *)ctx;
+    if (!p || !p->view) return;
+
+    /* Ignore if already running */
+    if (p->batch_timer || p->batch_start_pending) return;
+
+    settings_view_set_batch_status(p->view, "BATCH STARTING...");
+    settings_view_set_batch_enabled(p->view, 0);
+
+    p->batch_start_pending = 1u;
+    lv_async_call(batch_start_async_cb, p);
 }

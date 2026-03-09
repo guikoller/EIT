@@ -1,9 +1,10 @@
 #include "home_view.h"
+#include "assets/time_logo.h"
 
 #include <string.h>
 
 /* ---- Colour palette (matches existing app theme) ---- */
-#define COL_BG          0x0a0a0a
+#define COL_BG          0xffffff
 #define COL_ACCENT      0x4a9fd8
 #define COL_BTN         0x2a7da8
 #define COL_BTN_ABOUT   0x555555
@@ -121,33 +122,27 @@ void home_view_create(home_view_t *view, lv_obj_t *parent,
     lv_obj_set_style_pad_all(view->cont, 0, 0);
     lv_obj_center(view->cont);
 
-    /* Title */
-    view->label_title = lv_label_create(view->cont);
-    lv_label_set_text(view->label_title, "EIT System");
-    lv_obj_set_style_text_color(view->label_title, lv_color_hex(COL_ACCENT), 0);
-    lv_obj_set_style_text_font(view->label_title, &lv_font_montserrat_22, 0);
-    lv_obj_align(view->label_title, LV_ALIGN_TOP_MID, 0, 40);
+    /* Project logo */
+    view->img_logo = lv_image_create(view->cont);
+    lv_image_set_src(view->img_logo, &time_logo);
+    lv_image_set_scale(view->img_logo, 420); /* ~1.41x */
+    lv_obj_align(view->img_logo, LV_ALIGN_TOP_MID, 0, 18);
 
-    /* Subtitle */
-    view->label_subtitle = lv_label_create(view->cont);
-    lv_label_set_text(view->label_subtitle,
-        "Electrical Impedance Tomography");
-    lv_obj_set_style_text_color(view->label_subtitle, lv_color_hex(0x888888), 0);
-    lv_obj_set_style_text_font(view->label_subtitle, &lv_font_montserrat_14, 0);
-    lv_obj_align(view->label_subtitle, LV_ALIGN_TOP_MID, 0, 72);
+    view->label_title = NULL;
+    view->label_subtitle = NULL;
 
     /* Menu buttons — stacked vertically in the centre */
     view->btn_start = make_menu_btn(view->cont, LV_SYMBOL_PLAY "  START",
                                     COL_BTN, start_clicked, view);
-    lv_obj_align(view->btn_start, LV_ALIGN_CENTER, 0, -50);
+    lv_obj_align(view->btn_start, LV_ALIGN_CENTER, 0, 30);
 
     view->btn_settings = make_menu_btn(view->cont, LV_SYMBOL_SETTINGS "  SETTINGS",
                                        COL_BTN, settings_clicked, view);
-    lv_obj_align(view->btn_settings, LV_ALIGN_CENTER, 0, 20);
+    lv_obj_align(view->btn_settings, LV_ALIGN_CENTER, 0, 100);
 
     view->btn_about = make_menu_btn(view->cont, LV_SYMBOL_LIST "  ABOUT",
                                     COL_BTN_ABOUT, about_clicked, view);
-    lv_obj_align(view->btn_about, LV_ALIGN_CENTER, 0, 90);
+    lv_obj_align(view->btn_about, LV_ALIGN_CENTER, 0, 170);
 
     /* About overlay (hidden) */
     view->about_overlay = build_about_overlay(view->cont, view);

@@ -20,6 +20,7 @@ typedef struct {
     settings_imgsize_cb_t on_image_size;
     settings_bool_cb_t  on_show_data_table;
     settings_cb_t       on_calibrate;
+    settings_cb_t       on_batch;
 } settings_view_bindings_t;
 
 typedef struct {
@@ -38,6 +39,10 @@ typedef struct {
     /* Calibrate button + status */
     lv_obj_t *btn_calibrate;
     lv_obj_t *label_calib_status;
+
+    /* Batch process button + status */
+    lv_obj_t *btn_batch;
+    lv_obj_t *label_batch_status;
 
     /* Back button */
     lv_obj_t *btn_back;
@@ -59,6 +64,12 @@ void settings_view_set_calib_status(settings_view_t *view, const char *text);
 
 /** Enable / disable the calibrate button. */
 void settings_view_set_calib_enabled(settings_view_t *view, int enabled);
+
+/** Update the batch-process status text. */
+void settings_view_set_batch_status(settings_view_t *view, const char *text);
+
+/** Enable / disable the batch-process button. */
+void settings_view_set_batch_enabled(settings_view_t *view, int enabled);
 
 #ifdef __cplusplus
 }

@@ -87,9 +87,19 @@ add_executable(${PROJECT_NAME}
     src/main.c
     src/app/app_coordinator.c
     src/app/app_fsm.c
+    src/assets/time_logo.c
     src/services/storage_service.c
     src/services/dataset_service.c
     src/services/calibration.c
+    src/services/eit_acquisition.c
+    src/services/eit_acq_simulated.c
+    src/services/batch_process.c
+    src/screens/home/home_screen.c
+    src/screens/home/home_view.c
+    src/screens/home/home_presenter.c
+    src/screens/settings/settings_screen.c
+    src/screens/settings/settings_view.c
+    src/screens/settings/settings_presenter.c
     src/screens/browser/sd_file_browser.c
     src/screens/browser/sd_file_browser_view.c
     src/screens/browser/sd_file_browser_presenter.c

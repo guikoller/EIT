@@ -51,16 +51,184 @@ static void recon_return_async_cb(void *user_data)
     app_coordinator_post_event(&evt);
 }
 
-static int make_unique_bmp_path(char *out, size_t outsz)
+/**
+ * Build a unique file path from the current target filename + active algorithm.
+ *
+ * Example: filename = "datamat_4_3.bin", algo = EIT_ALGO_LBP, ext = "bmp"
+ *          -> "0:/datamat_4_3_LBP.bmp"
+ *
+ * If the file already exists a numeric suffix is appended:
+ *          -> "0:/datamat_4_3_LBP_001.bmp"
+ */
+static int make_unique_path(char *out, size_t outsz,
+                            const char *filename, const char *ext)
 {
+    /* ---- Strip extension from filename ---- */
+    char base[64];
+    strncpy(base, filename, sizeof(base) - 1);
+    base[sizeof(base) - 1] = '\0';
+    char *dot = strrchr(base, '.');
+    if (dot) *dot = '\0';
+
+    /* ---- Algorithm tag ---- */
+    const app_state_t *st = app_coordinator_get_state();
+    const char *algo_tag = "LBP";
+    if (st->settings.algorithm == EIT_ALGO_DBAR) algo_tag = "DBar";
+
+    /* ---- First attempt: base_algo.ext ---- */
     FILINFO fno;
-    for (uint32_t i = 0; i < 1000; i++) {
-        snprintf(out, outsz, "0:/recon_%03lu.bmp", (unsigned long)i);
+    snprintf(out, outsz, "0:/%s_%s.%s", base, algo_tag, ext);
+    if (f_stat(out, &fno) != FR_OK) {
+        return 1;   /* doesn't exist yet — use it */
+    }
+
+    /* ---- Fallback: base_algo_NNN.ext ---- */
+    for (uint32_t i = 1; i < 1000; i++) {
+        snprintf(out, outsz, "0:/%s_%s_%03lu.%s",
+                 base, algo_tag, (unsigned long)i, ext);
         if (f_stat(out, &fno) != FR_OK) {
             return 1;
         }
     }
     return 0;
+}
+
+/* Backward-compatible wrapper */
+static int make_unique_bmp_path(char *out, size_t outsz,
+                                const char *filename)
+{
+    return make_unique_path(out, outsz, filename, "bmp");
+}
+
+/**
+ * Convert a float to a decimal ASCII string using ONLY integer printf
+ * formatters (%ld, %lu).  This avoids the need for float-aware printf
+ * which is not available when linking with -nodefaultlibs.
+ *
+ * Output uses scientific notation: [-]D.DDDDDDeN
+ * 7 significant digits — enough for float32 full precision.
+ *
+ * Returns the number of characters written (excluding NUL).
+ */
+static int float_to_str(char *buf, size_t bufsz, float val)
+{
+    /* NaN: val != val is the portable test */
+    if (val != val) {
+        if (bufsz >= 4) { buf[0]='N'; buf[1]='a'; buf[2]='N'; buf[3]='\0'; }
+        return 3;
+    }
+
+    /* Zero */
+    if (val == 0.0f) {
+        if (bufsz >= 2) { buf[0]='0'; buf[1]='\0'; }
+        return 1;
+    }
+
+    int neg = 0;
+    if (val < 0.0f) { neg = 1; val = -val; }
+
+    /* Find decimal exponent: normalise val into [1.0, 10.0) */
+    int exp10 = 0;
+    if (val >= 10.0f) {
+        while (val >= 1000.0f) { val *= 0.001f; exp10 += 3; }
+        while (val >= 10.0f)   { val *= 0.1f;   exp10 += 1; }
+    } else if (val < 1.0f) {
+        while (val < 0.001f) { val *= 1000.0f; exp10 -= 3; }
+        while (val < 1.0f)   { val *= 10.0f;   exp10 -= 1; }
+    }
+
+    /* Extract 7 significant digits as integer */
+    uint32_t sig = (uint32_t)(val * 1000000.0f + 0.5f);
+    if (sig >= 10000000u) { sig /= 10u; exp10++; }
+
+    /* Split into integer digit + 6 fractional digits */
+    uint32_t d0   = sig / 1000000u;
+    uint32_t frac = sig % 1000000u;
+
+    /* Strip trailing zeros from fraction for cleaner output */
+    int frac_digits = 6;
+    while (frac_digits > 0 && (frac % 10u) == 0) {
+        frac /= 10u;
+        frac_digits--;
+    }
+
+    int len;
+    if (frac_digits == 0 && exp10 == 0) {
+        len = snprintf(buf, bufsz, "%s%lu",
+                       neg ? "-" : "", (unsigned long)d0);
+    } else if (frac_digits == 0) {
+        len = snprintf(buf, bufsz, "%s%lue%d",
+                       neg ? "-" : "", (unsigned long)d0, exp10);
+    } else if (exp10 == 0) {
+        len = snprintf(buf, bufsz, "%s%lu.%0*lu",
+                       neg ? "-" : "", (unsigned long)d0,
+                       frac_digits, (unsigned long)frac);
+    } else {
+        len = snprintf(buf, bufsz, "%s%lu.%0*lue%d",
+                       neg ? "-" : "", (unsigned long)d0,
+                       frac_digits, (unsigned long)frac, exp10);
+    }
+    return (len > 0) ? len : 0;
+}
+
+/**
+ * Export the raw reconstruction matrix (float) as a CSV file.
+ *
+ * Writes EIT_IMAGE_SIZE rows × EIT_IMAGE_SIZE columns.
+ * NaN values (pixels outside the circular mask) are written as "NaN".
+ * Uses manual float→string to avoid needing float-aware printf.
+ *
+ * Large locals are static to avoid stack overflow in the LVGL async
+ * callback context.
+ *
+ * Returns 1 on success, 0 on failure.
+ */
+static int save_csv_sync(const char *filename, const float *image_data,
+                         uint32_t image_size)
+{
+    static char csv_path[64];
+    if (!make_unique_path(csv_path, sizeof(csv_path), filename, "csv")) {
+        return 0;
+    }
+
+    static FIL fil;
+    FRESULT res = f_open(&fil, csv_path, FA_CREATE_ALWAYS | FA_WRITE);
+    if (res != FR_OK) {
+        return 0;
+    }
+
+    /* Write row by row.  32 floats × ~15 chars each + commas ≈ ~512 chars */
+    static char linebuf[768];
+
+    for (uint32_t row = 0; row < image_size; row++) {
+        uint32_t pos = 0;
+        for (uint32_t col = 0; col < image_size; col++) {
+            float val = image_data[row * image_size + col];
+
+            int written = float_to_str(&linebuf[pos],
+                                       sizeof(linebuf) - pos, val);
+            if (written > 0) pos += (uint32_t)written;
+
+            /* Comma separator (not after last column) */
+            if (col < image_size - 1u && pos < sizeof(linebuf) - 1u) {
+                linebuf[pos++] = ',';
+            }
+        }
+        /* Newline */
+        if (pos < sizeof(linebuf) - 1u) {
+            linebuf[pos++] = '\n';
+        }
+
+        UINT bw = 0;
+        res = f_write(&fil, linebuf, (UINT)pos, &bw);
+        if (res != FR_OK || bw != (UINT)pos) {
+            f_close(&fil);
+            return 0;
+        }
+    }
+
+    f_close(&fil);
+    return 1;
 }
 
 static void write_u16_le(uint8_t *dst, uint16_t v)
@@ -178,11 +346,20 @@ static void save_start_async_cb(void *user_data)
         return;
     }
 
-    if (!make_unique_bmp_path(p->save_path, sizeof(p->save_path))) {
+    if (!make_unique_bmp_path(p->save_path, sizeof(p->save_path),
+                             p->current_filename)) {
         reconstruction_viewer_view_set_status(p->view, "SAVE ERROR: name");
         return;
     }
 
+    /* ---- Export raw data as CSV (synchronous, ~12 KB) ---- */
+    if (p->recon_result->image_data) {
+        save_csv_sync(p->current_filename,
+                      p->recon_result->image_data,
+                      p->recon_result->image_size);
+    }
+
+    /* ---- Start BMP save (asynchronous, timer-based) ---- */
     p->save_last_res = f_open(&p->save_file, p->save_path, FA_CREATE_ALWAYS | FA_WRITE);
     if (p->save_last_res != FR_OK) {
         char err[64];

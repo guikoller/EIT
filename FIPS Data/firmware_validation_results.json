@@ -1,0 +1,72 @@
+[
+  {
+    "file": "datamat_2_2_LBP.bmp",
+    "stem": "datamat_2_2",
+    "algo": "LBP",
+    "size": 288,
+    "CC": 0.9060700992303359,
+    "RIE": 0.39778008450543156,
+    "PSNR": 21.88484585421587,
+    "orient": "flip_X"
+  },
+  {
+    "file": "datamat_2_3_LBP.bmp",
+    "stem": "datamat_2_3",
+    "algo": "LBP",
+    "size": 288,
+    "CC": 0.9476005277066255,
+    "RIE": 0.2899987685207166,
+    "PSNR": 24.028670716985154,
+    "orient": "flip_X"
+  },
+  {
+    "file": "datamat_2_4_LBP.bmp",
+    "stem": "datamat_2_4",
+    "algo": "LBP",
+    "size": 288,
+    "CC": 0.9260992024172962,
+    "RIE": 0.34768861655260386,
+    "PSNR": 22.721373520490246,
+    "orient": "original"
+  },
+  {
+    "file": "datamat_2_5_LBP.bmp",
+    "stem": "datamat_2_5",
+    "algo": "LBP",
+    "size": 288,
+    "CC": 0.9025412635382394,
+    "RIE": 0.395585991833615,
+    "PSNR": 22.099008668181405,
+    "orient": "original"
+  },
+  {
+    "file": "datamat_3_2_LBP.bmp",
+    "stem": "datamat_3_2",
+    "algo": "LBP",
+    "size": 288,
+    "CC": 0.7137852954174188,
+    "RIE": 0.6654672483446801,
+    "PSNR": 17.655407897094147,
+    "orient": "original"
+  },
+  {
+    "file": "datamat_4_1_LBP.bmp",
+    "stem": "datamat_4_1",
+    "algo": "LBP",
+    "size": 288,
+    "CC": 0.7356168339046619,
+    "RIE": 0.6591437576860821,
+    "PSNR": 18.00273947121331,
+    "orient": "original"
+  },
+  {
+    "file": "datamat_5_1_LBP.bmp",
+    "stem": "datamat_5_1",
+    "algo": "LBP",
+    "size": 288,
+    "CC": 0.7610338752877222,
+    "RIE": 0.6271029940526399,
+    "PSNR": 17.26954259149401,
+    "orient": "original"
+  }
+]

@@ -24,6 +24,8 @@ typedef struct {
     lv_obj_t *cont;
     lv_obj_t *tabview;
     lv_obj_t *label_title;
+    lv_obj_t *btn_return;
+    lv_obj_t *btn_run;
 
     lv_obj_t *table_curr;
     lv_obj_t *table_uel;

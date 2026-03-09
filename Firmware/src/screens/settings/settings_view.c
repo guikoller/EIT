@@ -76,6 +76,13 @@ static void calibrate_clicked(lv_event_t *e)
         v->bindings.on_calibrate(v->bindings.ctx);
 }
 
+static void batch_clicked(lv_event_t *e)
+{
+    settings_view_t *v = (settings_view_t *)lv_event_get_user_data(e);
+    if (v && v->bindings.on_batch)
+        v->bindings.on_batch(v->bindings.ctx);
+}
+
 /* ---- Helper: section label ---- */
 static lv_obj_t *make_section_label(lv_obj_t *parent, const char *text,
                                     lv_align_t align, int x, int y)
@@ -113,7 +120,7 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
 
     /* ---- Card area ---- */
     lv_obj_t *card = lv_obj_create(view->cont);
-    lv_obj_set_size(card, 700, 400);
+    lv_obj_set_size(card, 700, 480);
     lv_obj_align(card, LV_ALIGN_CENTER, 0, 5);
     lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
     lv_obj_set_style_border_color(card, lv_color_hex(0x3a3a3a), 0);
@@ -122,7 +129,7 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     lv_obj_set_style_pad_all(card, 25, 0);
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_row(card, 20, 0);
+    lv_obj_set_style_pad_row(card, 12, 0);
 
     /* ---- Row 1: Algorithm ---- */
     lv_obj_t *row1 = lv_obj_create(card);
@@ -165,7 +172,7 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     /* ---- Row 3: Show Data Table ---- */
     lv_obj_t *row3 = lv_obj_create(card);
     lv_obj_set_size(row3, LV_PCT(100), LV_SIZE_CONTENT);
-    lv_obj_set_style_min_height(row3, 60, 0);
+    lv_obj_set_style_min_height(row3, 110, 0);
     lv_obj_set_style_bg_opa(row3, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(row3, 0, 0);
     lv_obj_set_style_pad_all(row3, 0, 0);
@@ -176,10 +183,11 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     lv_checkbox_set_text(view->cb_data_table, "");
     lv_obj_align(view->cb_data_table, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_set_style_pad_column(view->cb_data_table, 10, 0);
-    lv_obj_set_size(view->cb_data_table, 50, 50);
+    lv_obj_set_size(view->cb_data_table, 100, 100);
     lv_obj_set_style_bg_color(view->cb_data_table, lv_color_hex(COL_ACCENT), LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_set_style_min_width(view->cb_data_table, 40, LV_PART_INDICATOR);
-    lv_obj_set_style_min_height(view->cb_data_table, 40, LV_PART_INDICATOR);
+    lv_obj_set_style_min_width(view->cb_data_table, 80, LV_PART_INDICATOR);
+    lv_obj_set_style_min_height(view->cb_data_table, 80, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(view->cb_data_table, 8, LV_PART_INDICATOR);
     lv_obj_add_event_cb(view->cb_data_table, datatable_changed, LV_EVENT_VALUE_CHANGED, view);
 
     /* ---- Row 4: Calibrate ---- */
@@ -205,12 +213,42 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     lv_obj_set_style_text_font(cal_lbl, &lv_font_montserrat_22, 0);
     lv_obj_center(cal_lbl);
 
+    /* ---- Row 5: Batch Process ---- */
+    lv_obj_t *row5 = lv_obj_create(card);
+    lv_obj_set_size(row5, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_min_height(row5, 60, 0);
+    lv_obj_set_style_bg_opa(row5, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row5, 0, 0);
+    lv_obj_set_style_pad_all(row5, 0, 0);
+
+    make_section_label(row5, "Batch Process", LV_ALIGN_LEFT_MID, 0, 0);
+
+    view->btn_batch = lv_button_create(row5);
+    lv_obj_set_size(view->btn_batch, 280, 50);
+    lv_obj_align(view->btn_batch, LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_set_style_bg_color(view->btn_batch, lv_color_hex(COL_BTN), 0);
+    lv_obj_set_style_radius(view->btn_batch, 8, 0);
+    lv_obj_add_event_cb(view->btn_batch, batch_clicked, LV_EVENT_CLICKED, view);
+
+    lv_obj_t *batch_lbl = lv_label_create(view->btn_batch);
+    lv_label_set_text(batch_lbl, LV_SYMBOL_DOWNLOAD "  BATCH PROCESS");
+    lv_obj_set_style_text_color(batch_lbl, lv_color_white(), 0);
+    lv_obj_set_style_text_font(batch_lbl, &lv_font_montserrat_22, 0);
+    lv_obj_center(batch_lbl);
+
     /* Calibration status label (below card, above back button) */
     view->label_calib_status = lv_label_create(view->cont);
     lv_label_set_text(view->label_calib_status, "");
     lv_obj_set_style_text_color(view->label_calib_status, lv_color_hex(COL_ACCENT), 0);
     lv_obj_set_style_text_font(view->label_calib_status, &lv_font_montserrat_14, 0);
     lv_obj_align(view->label_calib_status, LV_ALIGN_BOTTOM_MID, 0, -72);
+
+    /* Batch status label (shares area with calib status, slightly higher) */
+    view->label_batch_status = lv_label_create(view->cont);
+    lv_label_set_text(view->label_batch_status, "");
+    lv_obj_set_style_text_color(view->label_batch_status, lv_color_hex(COL_ACCENT), 0);
+    lv_obj_set_style_text_font(view->label_batch_status, &lv_font_montserrat_14, 0);
+    lv_obj_align(view->label_batch_status, LV_ALIGN_BOTTOM_MID, 0, -90);
 
     /* ---- Back button ---- */
     view->btn_back = lv_button_create(view->cont);
@@ -261,4 +299,19 @@ void settings_view_set_calib_enabled(settings_view_t *view, int enabled)
         lv_obj_clear_state(view->btn_calibrate, LV_STATE_DISABLED);
     else
         lv_obj_add_state(view->btn_calibrate, LV_STATE_DISABLED);
+}
+
+void settings_view_set_batch_status(settings_view_t *view, const char *text)
+{
+    if (!view || !view->label_batch_status) return;
+    lv_label_set_text(view->label_batch_status, text ? text : "");
+}
+
+void settings_view_set_batch_enabled(settings_view_t *view, int enabled)
+{
+    if (!view || !view->btn_batch) return;
+    if (enabled)
+        lv_obj_clear_state(view->btn_batch, LV_STATE_DISABLED);
+    else
+        lv_obj_add_state(view->btn_batch, LV_STATE_DISABLED);
 }

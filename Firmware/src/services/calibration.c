@@ -150,7 +150,9 @@ static void compute_row(uint16_t inj, uint16_t meas)
         float my = 0.0f;
 
         for (uint16_t e = 0; e < s_n_elec; e++) {
-            int8_t w8 = s_mp[(uint32_t)e * (uint32_t)s_n_meas + (uint32_t)meas];
+            /* MeasPattern is stored as (n_meas × n_elec) row-major in the
+             * binary dataset file.  Index: meas * n_elec + e.               */
+            int8_t w8 = s_mp[(uint32_t)meas * (uint32_t)s_n_elec + (uint32_t)e];
             if (w8 == 0) continue;
             float w = (float)w8;
 

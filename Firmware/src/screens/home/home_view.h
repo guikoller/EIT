@@ -18,6 +18,7 @@ typedef struct {
 
 typedef struct {
     lv_obj_t *cont;
+    lv_obj_t *img_logo;
     lv_obj_t *label_title;
     lv_obj_t *label_subtitle;
     lv_obj_t *btn_start;
