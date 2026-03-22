@@ -109,6 +109,7 @@ add_executable(${PROJECT_NAME}
     src/screens/reconstruction/reconstruction_viewer.c
     src/screens/reconstruction/reconstruction_viewer_view.c
     src/screens/reconstruction/reconstruction_viewer_presenter.c
+    src/algorithms/eidors_mask_32.c
     src/algorithms/lbp_reconstruction.c
     src/algorithms/dbar_reconstruction.c
     src/stm32f7xx_it.c

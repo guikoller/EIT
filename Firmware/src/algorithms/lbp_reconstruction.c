@@ -1,4 +1,5 @@
 #include "lbp_reconstruction.h"   /* brings in eit_config.h */
+#include "eidors_mask_32.h"
 #include "app/app_coordinator.h"
 #include "ff.h"
 #include "stm32f769i_discovery_sdram.h"
@@ -10,10 +11,32 @@ static SensitivityMatrixHeader s_header;
 static float* s_matrix = NULL;  // Will point to SDRAM
 static int initialized = 0;
 
+static float clamp01(float x)
+{
+    if (x < 0.0f) return 0.0f;
+    if (x > 1.0f) return 1.0f;
+    return x;
+}
+
+/* Approximation of MATLAB/Octave jet colormap on [0,1]. */
+static uint16_t jet_rgb565_from_norm(float t)
+{
+    float r = clamp01(1.5f - fabsf(4.0f * t - 3.0f));
+    float g = clamp01(1.5f - fabsf(4.0f * t - 2.0f));
+    float b = clamp01(1.5f - fabsf(4.0f * t - 1.0f));
+
+    uint8_t r8 = (uint8_t)(255.0f * r);
+    uint8_t g8 = (uint8_t)(255.0f * g);
+    uint8_t b8 = (uint8_t)(255.0f * b);
+
+    return (uint16_t)(((r8 & 0xF8u) << 8) | ((g8 & 0xFCu) << 3) | (b8 >> 3));
+}
+
 /* ---- Pre-allocated working buffers (no per-frame malloc) ---- */
 static ReconstructionResult s_result;
 static float    s_image_buf[EIT_MAX_PIXELS];        /* EIT_IMAGE_SIZE² floats */
 static float    s_delta_v[EIT_MAX_MEASUREMENTS];    /* max measurements       */
+static float    s_rot_buf[EIT_MAX_PIXELS];          /* rotation scratch       */
 
 /**
  * Initialize LBP reconstruction - load sensitivity matrix from SD card into SDRAM
@@ -54,6 +77,13 @@ int lbp_init(void)
     
     // Verify dimensions
     if (s_header.n_measurements > EIT_MAX_MEASUREMENTS || s_header.n_pixels > EIT_MAX_PIXELS) {
+        f_close(&file);
+        return 0;
+    }
+
+    // Strict mode: only accept sensitivity matrices compatible with
+    // the EIDORS LUT mask used for scientific validation.
+    if (s_header.image_size != EIDORS_MASK_SIZE) {
         f_close(&file);
         return 0;
     }
@@ -112,12 +142,20 @@ ReconstructionResult* lbp_reconstruct(const float* ref_uel, const float* target_
         result->image_data = NULL;
         return result;
     }
+
+    if (s_header.image_size != EIDORS_MASK_SIZE) {
+        snprintf(result->error_msg, sizeof(result->error_msg),
+                 "Unsupported image_size=%lu for EIDORS LUT (expected %u)",
+                 (unsigned long)s_header.image_size, (unsigned)EIDORS_MASK_SIZE);
+        result->image_data = NULL;
+        return result;
+    }
     
-    // Compute delta_v = target - reference (into static buffer)
+    // Compute delta_v with EIDORS-compatible sign convention.
     uint32_t idx = 0;
     for (uint16_t inj = 0; inj < n_inj; inj++) {
         for (uint16_t meas = 0; meas < n_meas; meas++) {
-            s_delta_v[idx] = target_uel[meas * n_inj + inj] - ref_uel[meas * n_inj + inj];
+            s_delta_v[idx] = ref_uel[meas * n_inj + inj] - target_uel[meas * n_inj + inj];
             idx++;
         }
     }
@@ -133,19 +171,27 @@ ReconstructionResult* lbp_reconstruct(const float* ref_uel, const float* target_
         
         s_image_buf[pixel] = sum;
     }
+
+    // Rotate reconstruction 90 degrees left in firmware so host scripts
+    // don't need to apply orientation correction on MCU CSVs.
+    {
+        uint32_t n = s_header.image_size;
+        for (uint32_t y = 0; y < n; y++) {
+            for (uint32_t x = 0; x < n; x++) {
+                uint32_t dst = y * n + x;
+                uint32_t src = x * n + (n - 1u - y);
+                s_rot_buf[dst] = s_image_buf[src];
+            }
+        }
+        memcpy(s_image_buf, s_rot_buf, s_header.n_pixels * sizeof(float));
+    }
     
-    // Apply circular mask (pixels outside circle = NaN)
-    float center = (s_header.image_size - 1) / 2.0f;
-    float radius = s_header.image_size / 2.0f;
-    
+    // Apply EIDORS-derived mask LUT to match PC reconstruction support.
     for (uint32_t y = 0; y < s_header.image_size; y++) {
         for (uint32_t x = 0; x < s_header.image_size; x++) {
-            float dx = x - center;
-            float dy = y - center;
-            float dist = sqrtf(dx * dx + dy * dy);
-            
-            if (dist > radius) {
-                s_image_buf[y * s_header.image_size + x] = NAN;
+            uint32_t p = y * s_header.image_size + x;
+            if (g_eidors_mask_32[p] == 0u) {
+                s_image_buf[p] = NAN;
             }
         }
     }
@@ -184,27 +230,14 @@ ReconstructionResult* lbp_reconstruct(const float* ref_uel, const float* target_
             if (isnan(val)) {
                 color = bg_color;
             } else {
-                float norm;
-                if (result->vmax - result->vmin > 0) {
-                    norm = 2.0f * (val - result->vmin) / (result->vmax - result->vmin) - 1.0f;
+                float t;
+                if (result->vmax - result->vmin > 0.0f) {
+                    t = (val - result->vmin) / (result->vmax - result->vmin);
                 } else {
-                    norm = 0.0f;
+                    t = 0.5f;
                 }
-                if (norm < -1.0f) norm = -1.0f;
-                if (norm > 1.0f) norm = 1.0f;
-                
-                uint8_t r, g, b;
-                if (norm < 0.0f) {
-                    r = 0;
-                    g = 0;
-                    b = (uint8_t)((-norm) * 255);
-                } else {
-                    r = (uint8_t)(norm * 255);
-                    g = 0;
-                    b = 0;
-                }
-                
-                color = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+                t = clamp01(t);
+                color = jet_rgb565_from_norm(t);
             }
             
             result->color_buffer[dst_y * disp_sz + dst_x] = color;

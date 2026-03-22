@@ -53,6 +53,57 @@ static int strcasecmp_a(const char *a, const char *b)
     return (unsigned char)*a - (unsigned char)*b;
 }
 
+/* Case-insensitive prefix match (ASCII only) */
+static int starts_with_ci(const char *s, const char *prefix)
+{
+    if (!s || !prefix) return 0;
+    while (*prefix) {
+        char a = *s;
+        char b = *prefix;
+        if (!a) return 0;
+        if (a >= 'A' && a <= 'Z') a = (char)(a - 'A' + 'a');
+        if (b >= 'A' && b <= 'Z') b = (char)(b - 'A' + 'a');
+        if (a != b) return 0;
+        s++;
+        prefix++;
+    }
+    return 1;
+}
+
+/* Remove old batch outputs (*.csv, *.bmp) from 0:/batch to avoid stale files. */
+static void clear_batch_outputs(void)
+{
+    DIR dir;
+    FILINFO fno;
+
+    if (f_opendir(&dir, BATCH_DIR) != FR_OK) {
+        return;
+    }
+
+    while (1) {
+        if (f_readdir(&dir, &fno) != FR_OK || fno.fname[0] == 0) {
+            break;
+        }
+        if (fno.fattrib & AM_DIR) {
+            continue;
+        }
+
+        const char *name = fno.fname;
+        size_t n = strlen(name);
+        int is_csv = (n >= 4) && (strcasecmp_a(name + n - 4, ".csv") == 0);
+        int is_bmp = (n >= 4) && (strcasecmp_a(name + n - 4, ".bmp") == 0);
+        if (!is_csv && !is_bmp) {
+            continue;
+        }
+
+        static char path[96];
+        snprintf(path, sizeof(path), BATCH_DIR "/%s", name);
+        (void)f_unlink(path);
+    }
+
+    (void)f_closedir(&dir);
+}
+
 /* ------------------------------------------------------------------ */
 /*  float → ASCII  (duplicated from reconstruction_viewer_presenter)   */
 /* ------------------------------------------------------------------ */
@@ -260,6 +311,7 @@ int batch_process_begin(void)
             snprintf(s_error, sizeof(s_error), "MKDIR r%u", (unsigned)res);
             return 0;
         }
+        clear_batch_outputs();
     }
 
     /* ---- Scan root for .bin files ---- */
@@ -274,6 +326,11 @@ int batch_process_begin(void)
     int found_ref = 0;
     char ref_actual[STORAGE_FILENAME_MAX] = {0};
     for (int i = 0; i < count; i++) {
+        /* Batch only uses measurement datasets named datamat_*.bin */
+        if (!starts_with_ci(entries[i].filename, "datamat_")) {
+            continue;
+        }
+
         /* Case-insensitive compare with reference filename */
         if (strcasecmp_a(entries[i].filename, REF_FILENAME) == 0) {
             found_ref = 1;
