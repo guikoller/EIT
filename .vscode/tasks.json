@@ -7,7 +7,7 @@
       "command": "matlab",
       "args": ["-batch", "run_batch_validate"],
       "options": {
-        "cwd": "${workspaceFolder}/FIPS Data",
+        "cwd": "${workspaceFolder}/Validation",
         "env": {
           "EIDORS_DIR": "C:\\Users\\g_kol\\Downloads\\eidors-v3.12-ng\\eidors-v3.12-ng\\eidors"
         }
@@ -24,7 +24,7 @@
       "command": "matlab",
       "args": ["-batch", "generate_eidors_mask_lut"],
       "options": {
-        "cwd": "${workspaceFolder}/FIPS Data",
+        "cwd": "${workspaceFolder}/Validation",
         "env": {
           "EIDORS_DIR": "C:\\Users\\g_kol\\Downloads\\eidors-v3.12-ng\\eidors-v3.12-ng\\eidors"
         }
@@ -37,7 +37,7 @@
       "command": "pdflatex",
       "args": ["-interaction=nonstopmode", "-halt-on-error", "artigo_eit.tex"],
       "options": {
-        "cwd": "${workspaceFolder}/FIPS Data"
+        "cwd": "${workspaceFolder}/Article"
       },
       "problemMatcher": []
     }
