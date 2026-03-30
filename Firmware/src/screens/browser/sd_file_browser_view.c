@@ -3,6 +3,17 @@
 #include <string.h>
 #include <stdio.h>
 
+/* ---- Light theme color palette ---- */
+#define COL_BG          0xf5f5f5
+#define COL_LIST_BG     0xffffff
+#define COL_LIST_BORDER 0xe0e0e0
+#define COL_ITEM_BG     0xffffff
+#define COL_ITEM_SEL    0xe3f2fd
+#define COL_TEXT        0x333333
+#define COL_TEXT_SEC    0x666666
+#define COL_ACCENT      0x4a9fd8
+#define COL_BTN         0x2a7da8
+
 static void file_item_clicked(lv_event_t *e)
 {
     sd_file_browser_view_t *view = (sd_file_browser_view_t *)lv_event_get_user_data(e);
@@ -15,11 +26,11 @@ static void file_item_clicked(lv_event_t *e)
 
     if(view->selected_file_obj != NULL)
     {
-        lv_obj_set_style_bg_color(view->selected_file_obj, lv_color_hex(0x2a2a2a), 0);
+        lv_obj_set_style_bg_color(view->selected_file_obj, lv_color_hex(COL_ITEM_BG), 0);
     }
 
     view->selected_file_obj = btn;
-    lv_obj_set_style_bg_color(btn, lv_color_hex(0x1a5f7a), 0);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(COL_ITEM_SEL), 0);
 
     lv_obj_t *label = lv_obj_get_child(btn, 1);
     if(label == NULL) return;
@@ -84,44 +95,55 @@ void sd_file_browser_view_create(sd_file_browser_view_t *view, lv_obj_t *parent,
         memset(&view->bindings, 0, sizeof(view->bindings));
     }
 
+    /* Full-screen container - light background */
     view->cont = lv_obj_create(parent);
     lv_obj_set_size(view->cont, LV_HOR_RES, LV_VER_RES);
-    lv_obj_set_style_bg_color(view->cont, lv_color_hex(0x0a0a0a), 0);
+    lv_obj_set_style_bg_color(view->cont, lv_color_hex(COL_BG), 0);
     lv_obj_set_style_border_width(view->cont, 0, 0);
     lv_obj_set_style_pad_all(view->cont, 0, 0);
     lv_obj_center(view->cont);
 
+    /* Title label */
     view->label_title = lv_label_create(view->cont);
     lv_label_set_text(view->label_title, "SD STORAGE");
-    lv_obj_set_style_text_color(view->label_title, lv_color_hex(0x4a9fd8), 0);
+    lv_obj_set_style_text_color(view->label_title, lv_color_hex(COL_ACCENT), 0);
     lv_obj_set_style_text_font(view->label_title, &lv_font_montserrat_22, 0);
-    lv_obj_align(view->label_title, LV_ALIGN_TOP_LEFT, 20, 15);
+    lv_obj_align(view->label_title, LV_ALIGN_TOP_LEFT, 25, 18);
 
+    /* File list - white background with subtle border */
     view->file_list = lv_list_create(view->cont);
-    lv_obj_set_size(view->file_list, LV_HOR_RES - 60, LV_VER_RES - 150);
+    lv_obj_set_size(view->file_list, LV_HOR_RES - 50, LV_VER_RES - 140);
     lv_obj_align(view->file_list, LV_ALIGN_TOP_MID, 0, 55);
-    lv_obj_set_style_bg_color(view->file_list, lv_color_hex(0x1a1a1a), 0);
-    lv_obj_set_style_border_color(view->file_list, lv_color_hex(0x3a3a3a), 0);
-    lv_obj_set_style_border_width(view->file_list, 2, 0);
-    lv_obj_set_style_radius(view->file_list, 5, 0);
+    lv_obj_set_style_bg_color(view->file_list, lv_color_hex(COL_LIST_BG), 0);
+    lv_obj_set_style_border_color(view->file_list, lv_color_hex(COL_LIST_BORDER), 0);
+    lv_obj_set_style_border_width(view->file_list, 1, 0);
+    lv_obj_set_style_radius(view->file_list, 8, 0);
+    lv_obj_set_style_shadow_width(view->file_list, 4, 0);
+    lv_obj_set_style_shadow_color(view->file_list, lv_color_hex(0xdddddd), 0);
+    lv_obj_set_style_shadow_ofs_y(view->file_list, 2, 0);
 
+    /* Status label */
     view->label_status = lv_label_create(view->cont);
     lv_label_set_text(view->label_status, "READY");
-    lv_obj_set_style_text_color(view->label_status, lv_color_white(), 0);
-    lv_obj_set_style_text_font(view->label_status, &lv_font_montserrat_22, 0);
-    /* Vertically align with the bottom buttons (y=-20, h=50 => center is -45). */
+    lv_obj_set_style_text_color(view->label_status, lv_color_hex(COL_TEXT_SEC), 0);
+    lv_obj_set_style_text_font(view->label_status, &lv_font_montserrat_14, 0);
     lv_obj_align(view->label_status, LV_ALIGN_BOTTOM_MID, 0, -45);
 
+    /* Load button */
     view->btn_load = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_load, 220, 50);
-    lv_obj_align(view->btn_load, LV_ALIGN_BOTTOM_MID, 0, -20);
-    lv_obj_set_style_bg_color(view->btn_load, lv_color_hex(0x2a7da8), 0);
-    lv_obj_set_style_radius(view->btn_load, 5, 0);
+    lv_obj_set_size(view->btn_load, 240, 55);
+    lv_obj_align(view->btn_load, LV_ALIGN_BOTTOM_MID, 0, -15);
+    lv_obj_set_style_bg_color(view->btn_load, lv_color_hex(COL_BTN), 0);
+    lv_obj_set_style_radius(view->btn_load, 8, 0);
+    lv_obj_set_style_shadow_width(view->btn_load, 6, 0);
+    lv_obj_set_style_shadow_color(view->btn_load, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(view->btn_load, 3, 0);
     lv_obj_add_event_cb(view->btn_load, load_btn_clicked, LV_EVENT_CLICKED, view);
 
     lv_obj_t *btn_label = lv_label_create(view->btn_load);
-    lv_label_set_text(btn_label, "LOAD DATASET");
+    lv_label_set_text(btn_label, LV_SYMBOL_UPLOAD "  LOAD DATASET");
     lv_obj_set_style_text_color(btn_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(btn_label, &lv_font_montserrat_14, 0);
     lv_obj_center(btn_label);
 
     view->selected_file_obj = NULL;
@@ -177,24 +199,26 @@ void sd_file_browser_view_set_files(sd_file_browser_view_t *view, const sd_brows
         snprintf(label_text, sizeof(label_text), "%s | %s", entries[i].filename, size_str);
 
         lv_obj_t *btn = lv_list_add_button(view->file_list, LV_SYMBOL_FILE, label_text);
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x2a2a2a), 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(COL_ITEM_BG), 0);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(btn, 0, 0);
-        lv_obj_set_style_pad_all(btn, 18, 0);
-        lv_obj_set_style_min_height(btn, 60, 0);
+        lv_obj_set_style_border_side(btn, LV_BORDER_SIDE_BOTTOM, 0);
+        lv_obj_set_style_border_color(btn, lv_color_hex(COL_LIST_BORDER), 0);
+        lv_obj_set_style_pad_all(btn, 16, 0);
+        lv_obj_set_style_min_height(btn, 55, 0);
         lv_obj_add_event_cb(btn, file_item_clicked, LV_EVENT_CLICKED, view);
 
         uint32_t ccount = lv_obj_get_child_count(btn);
         if(ccount > 0)
         {
             lv_obj_t *icon = lv_obj_get_child(btn, 0);
-            lv_obj_set_style_text_color(icon, lv_color_white(), 0);
+            lv_obj_set_style_text_color(icon, lv_color_hex(COL_ACCENT), 0);
         }
         if(ccount > 1)
         {
             lv_obj_t *label = lv_obj_get_child(btn, 1);
-            lv_obj_set_style_text_color(label, lv_color_white(), 0);
-            lv_obj_set_style_text_font(label, &lv_font_montserrat_22, 0);
+            lv_obj_set_style_text_color(label, lv_color_hex(COL_TEXT), 0);
+            lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
         }
     }
 }

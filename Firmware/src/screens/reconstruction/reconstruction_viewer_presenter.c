@@ -2,7 +2,6 @@
 
 #include "app/app_coordinator.h"
 #include "services/eit_acq_simulated.h"
-#include "algorithms/dbar_reconstruction.h"
 #include "eit_config.h"
 
 #include <string.h>
@@ -71,9 +70,7 @@ static int make_unique_path(char *out, size_t outsz,
     if (dot) *dot = '\0';
 
     /* ---- Algorithm tag ---- */
-    const app_state_t *st = app_coordinator_get_state();
     const char *algo_tag = "LBP";
-    if (st->settings.algorithm == EIT_ALGO_DBAR) algo_tag = "DBar";
 
     /* ---- First attempt: base_algo.ext ---- */
     FILINFO fno;
@@ -418,14 +415,7 @@ static ReconstructionResult *dispatch_reconstruct(
     const float *ref_uel, const float *target_uel,
     uint16_t n_meas, uint16_t n_inj)
 {
-    const app_state_t *st = app_coordinator_get_state();
-    switch (st->settings.algorithm) {
-    case EIT_ALGO_DBAR:
-        return dbar_reconstruct(ref_uel, target_uel, n_meas, n_inj);
-    case EIT_ALGO_LBP:
-    default:
-        return lbp_reconstruct(ref_uel, target_uel, n_meas, n_inj);
-    }
+    return lbp_reconstruct(ref_uel, target_uel, n_meas, n_inj);
 }
 
 /* ---------- Continuous acquisition timer ---------- */
@@ -504,9 +494,7 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
     /* Show which algorithm is active */
     {
         const app_state_t *st = app_coordinator_get_state();
-        const char *algo_name = "LBP";
-        if (st->settings.algorithm == EIT_ALGO_DBAR) algo_name = "D-Bar";
-        reconstruction_viewer_view_set_algorithm(presenter->view, algo_name);
+        reconstruction_viewer_view_set_algorithm(presenter->view, "LBP");
 
         /* Apply display size from settings */
         uint32_t dsz = eit_display_size_for_setting(st->settings.image_size);
@@ -554,9 +542,6 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
             return;
         }
     }
-
-    /* Initialize D-bar module (reuses the sensitivity matrix from LBP) */
-    dbar_init();
 
     /* Get initial frame for immediate display (first get_frame works without start_frame) */
     reconstruction_viewer_view_set_status(presenter->view, "First reconstruction...");

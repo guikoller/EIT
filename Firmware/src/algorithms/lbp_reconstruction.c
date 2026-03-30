@@ -218,7 +218,8 @@ ReconstructionResult* lbp_reconstruct(const float* ref_uel, const float* target_
     uint32_t scale = disp_sz / s_header.image_size;
     result->color_buffer = (uint16_t*)EIT_SDRAM_COLOR_BUF_ADDR;
     
-    uint16_t bg_color = 0x0000;
+    /* Light theme background: 0xf5f5f5 -> RGB565 = 0xF7BE */
+    uint16_t bg_color = 0xF7BE;
     
     for (uint32_t dst_y = 0; dst_y < disp_sz; dst_y++) {
         for (uint32_t dst_x = 0; dst_x < disp_sz; dst_x++) {

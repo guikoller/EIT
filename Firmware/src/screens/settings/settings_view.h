@@ -33,8 +33,8 @@ typedef struct {
     /* Image-size dropdown */
     lv_obj_t *dd_image_size;
 
-    /* Show data-table checkbox */
-    lv_obj_t *cb_data_table;
+    /* Show data-table switch */
+    lv_obj_t *sw_data_table;
 
     /* Calibrate button + status */
     lv_obj_t *btn_calibrate;

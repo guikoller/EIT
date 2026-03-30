@@ -74,20 +74,15 @@ static inline uint32_t eit_display_size_for_setting(uint16_t image_size)
  *  matrix generation. */
 #define EIT_SDRAM_ELEC_FIELD_ADDR   ((uint32_t)0xC0A00000u)
 
-/** D-bar algorithm working memory (~20 KB). */
-#define EIT_SDRAM_DBAR_WORK_ADDR    ((uint32_t)0xC0B00000u)
-
 /** LVGL canvas pixel buffer for reconstruction view.
  *  Sized for EIT_DISPLAY_SIZE_MAX² × 2 = 295 KB.                     */
-#define EIT_SDRAM_CANVAS_BUF_ADDR   ((uint32_t)0xC0B10000u)
+#define EIT_SDRAM_CANVAS_BUF_ADDR   ((uint32_t)0xC0B00000u)
 
 /* ------------------------------------------------------------------ */
 /*  Algorithm selection                                                */
 /* ------------------------------------------------------------------ */
 typedef enum {
     EIT_ALGO_LBP = 0,
-    EIT_ALGO_DBAR,
-    /* future: EIT_ALGO_GREIT, ... */
     EIT_ALGO_COUNT
 } eit_algorithm_t;
 

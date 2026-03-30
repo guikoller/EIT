@@ -13,7 +13,6 @@ typedef struct {
     void           *ctx;
     home_menu_cb_t  on_start;
     home_menu_cb_t  on_settings;
-    home_menu_cb_t  on_about;
 } home_view_bindings_t;
 
 typedef struct {
@@ -23,10 +22,8 @@ typedef struct {
     lv_obj_t *label_subtitle;
     lv_obj_t *btn_start;
     lv_obj_t *btn_settings;
-    lv_obj_t *btn_about;
-
-    /* About overlay */
-    lv_obj_t *about_overlay;
+    lv_obj_t *btn_about;       /* unused, kept for ABI compat */
+    lv_obj_t *about_overlay;   /* unused, kept for ABI compat */
 
     home_view_bindings_t bindings;
 } home_view_t;

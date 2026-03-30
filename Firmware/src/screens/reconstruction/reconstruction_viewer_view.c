@@ -10,6 +10,20 @@
 #define NUM_ELEC          EIT_NUM_ELECTRODES
 #define PI_F              3.14159265f
 
+/* ---- Light theme color palette ---- */
+#define COL_BG          0xf5f5f5
+#define COL_TEXT        0x333333
+#define COL_TEXT_SEC    0x666666
+#define COL_ACCENT      0x4a9fd8
+#define COL_BTN         0x2a7da8
+#define COL_BTN_SEC     0x888888
+#define COL_BTN_PLAY    0x2e7d32
+#define COL_BTN_PAUSE   0xc62828
+#define COL_SLIDER_BG   0xe0e0e0
+#define COL_SLIDER_IND  0xd4aa00
+#define COL_FPS         0x2e7d32
+#define COL_ALGO        0xb8860b
+
 /* ---- Pre-computed overlay mask (recomputed when display_size changes) ---- */
 /* Bitmask: 1 bit per pixel, packed into uint32_t words (sized for max) */
 #define OVERLAY_WORDS_MAX ((DISPLAY_SIZE_MAX * DISPLAY_SIZE_MAX + 31u) / 32u)
@@ -137,7 +151,7 @@ static void create_canvas(reconstruction_viewer_view_t *view)
     lv_canvas_set_buffer(view->canvas, canvas_buf, dsz, dsz, LV_COLOR_FORMAT_RGB565);
 
     lv_obj_align(view->canvas, LV_ALIGN_CENTER, -30, 20);
-    lv_canvas_fill_bg(view->canvas, lv_color_hex(0x000000), LV_OPA_COVER);
+    lv_canvas_fill_bg(view->canvas, lv_color_hex(COL_BG), LV_OPA_COVER);
 }
 
 static void add_electrode_markers(reconstruction_viewer_view_t *view)
@@ -156,7 +170,7 @@ static void add_electrode_markers(reconstruction_viewer_view_t *view)
         char num[4];
         snprintf(num, sizeof(num), "%d", i + 1);
         lv_label_set_text(label, num);
-        lv_obj_set_style_text_color(label, lv_color_white(), 0);
+        lv_obj_set_style_text_color(label, lv_color_hex(COL_TEXT_SEC), 0);
         lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
 
         lv_obj_align_to(label, view->canvas, LV_ALIGN_TOP_LEFT, x - 8, y - 8);
@@ -177,35 +191,40 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     /* Set default display size (presenter may override via set_display_size) */
     view->display_size = EIT_DISPLAY_SIZE;
 
+    /* Full-screen container - light background */
     view->cont = lv_obj_create(parent);
     lv_obj_set_size(view->cont, LV_HOR_RES, LV_VER_RES);
-    lv_obj_set_style_bg_color(view->cont, lv_color_hex(0x0a0a0a), 0);
+    lv_obj_set_style_bg_color(view->cont, lv_color_hex(COL_BG), 0);
     lv_obj_set_style_border_width(view->cont, 0, 0);
     lv_obj_set_style_pad_all(view->cont, 0, 0);
     lv_obj_remove_flag(view->cont, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_align(view->cont, LV_ALIGN_TOP_LEFT, 0, 0);
 
+    /* Title label */
     view->label_title = lv_label_create(view->cont);
     lv_label_set_text(view->label_title, "");
-    lv_obj_set_style_text_color(view->label_title, lv_color_hex(0x4a9fd8), 0);
+    lv_obj_set_style_text_color(view->label_title, lv_color_hex(COL_ACCENT), 0);
     lv_obj_set_style_text_font(view->label_title, &lv_font_montserrat_22, 0);
     lv_obj_align(view->label_title, LV_ALIGN_TOP_MID, 0, 10);
 
+    /* Status label */
     view->label_status = lv_label_create(view->cont);
     lv_label_set_text(view->label_status, "");
-    lv_obj_set_style_text_color(view->label_status, lv_color_white(), 0);
+    lv_obj_set_style_text_color(view->label_status, lv_color_hex(COL_TEXT_SEC), 0);
     lv_obj_set_style_text_font(view->label_status, &lv_font_montserrat_14, 0);
     lv_obj_align(view->label_status, LV_ALIGN_TOP_MID, 0, 40);
 
+    /* FPS label */
     view->label_fps = lv_label_create(view->cont);
     lv_label_set_text(view->label_fps, "-- FPS");
-    lv_obj_set_style_text_color(view->label_fps, lv_color_hex(0x00ff00), 0);
+    lv_obj_set_style_text_color(view->label_fps, lv_color_hex(COL_FPS), 0);
     lv_obj_set_style_text_font(view->label_fps, &lv_font_montserrat_14, 0);
     lv_obj_align(view->label_fps, LV_ALIGN_TOP_RIGHT, -15, 15);
 
+    /* Algorithm label */
     view->label_algo = lv_label_create(view->cont);
     lv_label_set_text(view->label_algo, "");
-    lv_obj_set_style_text_color(view->label_algo, lv_color_hex(0xd4aa00), 0);
+    lv_obj_set_style_text_color(view->label_algo, lv_color_hex(COL_ALGO), 0);
     lv_obj_set_style_text_font(view->label_algo, &lv_font_montserrat_14, 0);
     lv_obj_align(view->label_algo, LV_ALIGN_TOP_LEFT, 15, 15);
 
@@ -216,8 +235,11 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     view->btn_play_pause = lv_button_create(view->cont);
     lv_obj_set_size(view->btn_play_pause, 80, 60);
     lv_obj_align(view->btn_play_pause, LV_ALIGN_LEFT_MID, 10, -25);
-    lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0x2a9d2a), 0);
-    lv_obj_set_style_radius(view->btn_play_pause, 5, 0);
+    lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(COL_BTN_PLAY), 0);
+    lv_obj_set_style_radius(view->btn_play_pause, 8, 0);
+    lv_obj_set_style_shadow_width(view->btn_play_pause, 4, 0);
+    lv_obj_set_style_shadow_color(view->btn_play_pause, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(view->btn_play_pause, 2, 0);
     lv_obj_add_event_cb(view->btn_play_pause, play_pause_btn_clicked, LV_EVENT_CLICKED, view);
 
     view->label_play_pause_text = lv_label_create(view->btn_play_pause);
@@ -228,8 +250,11 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     view->btn_noise = lv_button_create(view->cont);
     lv_obj_set_size(view->btn_noise, 80, 55);
     lv_obj_align(view->btn_noise, LV_ALIGN_LEFT_MID, 10, 45);
-    lv_obj_set_style_bg_color(view->btn_noise, lv_color_hex(0x555555), 0);
-    lv_obj_set_style_radius(view->btn_noise, 5, 0);
+    lv_obj_set_style_bg_color(view->btn_noise, lv_color_hex(COL_BTN_SEC), 0);
+    lv_obj_set_style_radius(view->btn_noise, 8, 0);
+    lv_obj_set_style_shadow_width(view->btn_noise, 4, 0);
+    lv_obj_set_style_shadow_color(view->btn_noise, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(view->btn_noise, 2, 0);
     lv_obj_add_event_cb(view->btn_noise, noise_btn_clicked, LV_EVENT_CLICKED, view);
 
     view->label_noise_text = lv_label_create(view->btn_noise);
@@ -244,22 +269,22 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     lv_obj_align(view->slider_noise, LV_ALIGN_RIGHT_MID, -30, 10);
     lv_slider_set_range(view->slider_noise, 0, 100);
     lv_slider_set_value(view->slider_noise, 10, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(view->slider_noise, lv_color_hex(0x333333), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(view->slider_noise, lv_color_hex(0xd4aa00), LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(view->slider_noise, lv_color_white(), LV_PART_KNOB);
+    lv_obj_set_style_bg_color(view->slider_noise, lv_color_hex(COL_SLIDER_BG), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(view->slider_noise, lv_color_hex(COL_SLIDER_IND), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(view->slider_noise, lv_color_hex(COL_BTN), LV_PART_KNOB);
     lv_obj_add_event_cb(view->slider_noise, noise_slider_changed, LV_EVENT_VALUE_CHANGED, view);
 
     /* Noise percentage label (above slider) */
     view->label_noise_pct = lv_label_create(view->cont);
     lv_label_set_text(view->label_noise_pct, "10%");
-    lv_obj_set_style_text_color(view->label_noise_pct, lv_color_hex(0xd4aa00), 0);
+    lv_obj_set_style_text_color(view->label_noise_pct, lv_color_hex(COL_SLIDER_IND), 0);
     lv_obj_set_style_text_font(view->label_noise_pct, &lv_font_montserrat_14, 0);
     lv_obj_align_to(view->label_noise_pct, view->slider_noise, LV_ALIGN_OUT_TOP_MID, 0, -8);
 
     /* Slider label at bottom */
     lv_obj_t *label_slider_title = lv_label_create(view->cont);
     lv_label_set_text(label_slider_title, "NOISE");
-    lv_obj_set_style_text_color(label_slider_title, lv_color_hex(0x888888), 0);
+    lv_obj_set_style_text_color(label_slider_title, lv_color_hex(COL_TEXT_SEC), 0);
     lv_obj_set_style_text_font(label_slider_title, &lv_font_montserrat_14, 0);
     lv_obj_align_to(label_slider_title, view->slider_noise, LV_ALIGN_OUT_BOTTOM_MID, 0, 8);
 
@@ -267,8 +292,11 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     lv_obj_t *btn_return = lv_button_create(view->cont);
     lv_obj_set_size(btn_return, 200, 55);
     lv_obj_align(btn_return, LV_ALIGN_BOTTOM_LEFT, 15, -10);
-    lv_obj_set_style_bg_color(btn_return, lv_color_hex(0x666666), 0);
-    lv_obj_set_style_radius(btn_return, 5, 0);
+    lv_obj_set_style_bg_color(btn_return, lv_color_hex(COL_BTN_SEC), 0);
+    lv_obj_set_style_radius(btn_return, 8, 0);
+    lv_obj_set_style_shadow_width(btn_return, 4, 0);
+    lv_obj_set_style_shadow_color(btn_return, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(btn_return, 2, 0);
     lv_obj_add_event_cb(btn_return, return_btn_clicked, LV_EVENT_CLICKED, view);
 
     lv_obj_t *label_return = lv_label_create(btn_return);
@@ -279,12 +307,15 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     view->btn_save = lv_button_create(view->cont);
     lv_obj_set_size(view->btn_save, 200, 55);
     lv_obj_align(view->btn_save, LV_ALIGN_BOTTOM_RIGHT, -15, -10);
-    lv_obj_set_style_bg_color(view->btn_save, lv_color_hex(0x2a7da8), 0);
-    lv_obj_set_style_radius(view->btn_save, 5, 0);
+    lv_obj_set_style_bg_color(view->btn_save, lv_color_hex(COL_BTN), 0);
+    lv_obj_set_style_radius(view->btn_save, 8, 0);
+    lv_obj_set_style_shadow_width(view->btn_save, 4, 0);
+    lv_obj_set_style_shadow_color(view->btn_save, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(view->btn_save, 2, 0);
     lv_obj_add_event_cb(view->btn_save, save_btn_clicked, LV_EVENT_CLICKED, view);
 
     lv_obj_t *label_save = lv_label_create(view->btn_save);
-    lv_label_set_text(label_save, "SAVE IMAGE");
+    lv_label_set_text(label_save, LV_SYMBOL_SAVE " SAVE IMAGE");
     lv_obj_set_style_text_color(label_save, lv_color_white(), 0);
     lv_obj_center(label_save);
 }
@@ -329,7 +360,8 @@ void reconstruction_viewer_view_render_rgb565(reconstruction_viewer_view_t *view
     /* Apply pre-computed overlay mask (fast bit-test loop, no trig) */
     precompute_overlay(dsz);
     uint16_t *buf16 = (uint16_t *)canvas_buf;
-    const uint16_t white_color = 0xFFFF;
+    /* Dark gray overlay for light theme (RGB565: 0x3186 ~ #333333) */
+    const uint16_t overlay_color = 0x3186;
     const uint32_t total_pixels = dsz * dsz;
     const uint32_t overlay_words = (total_pixels + 31u) / 32u;
 
@@ -341,7 +373,7 @@ void reconstruction_viewer_view_render_rgb565(reconstruction_viewer_view_t *view
             uint32_t bit = bits & (uint32_t)(-(int32_t)bits); /* lowest set bit */
             uint32_t idx = base + (uint32_t)__builtin_ctz(bits);
             if (idx < total_pixels) {
-                buf16[idx] = white_color;
+                buf16[idx] = overlay_color;
             }
             bits ^= bit;
         }
@@ -367,10 +399,10 @@ void reconstruction_viewer_view_set_play_state(reconstruction_viewer_view_t *vie
 
     if (playing) {
         lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PAUSE);
-        lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0xd44a00), 0);
+        lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(COL_BTN_PAUSE), 0);
     } else {
         lv_label_set_text(view->label_play_pause_text, LV_SYMBOL_PLAY);
-        lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(0x2a9d2a), 0);
+        lv_obj_set_style_bg_color(view->btn_play_pause, lv_color_hex(COL_BTN_PLAY), 0);
     }
 }
 
@@ -380,10 +412,10 @@ void reconstruction_viewer_view_set_noise_state(reconstruction_viewer_view_t *vi
 
     if (enabled) {
         lv_label_set_text(view->label_noise_text, "N:ON");
-        lv_obj_set_style_bg_color(view->btn_noise, lv_color_hex(0xd4aa00), 0);
+        lv_obj_set_style_bg_color(view->btn_noise, lv_color_hex(COL_SLIDER_IND), 0);
     } else {
         lv_label_set_text(view->label_noise_text, "N:OFF");
-        lv_obj_set_style_bg_color(view->btn_noise, lv_color_hex(0x555555), 0);
+        lv_obj_set_style_bg_color(view->btn_noise, lv_color_hex(COL_BTN_SEC), 0);
     }
 }
 
@@ -413,7 +445,7 @@ void reconstruction_viewer_view_set_display_size(reconstruction_viewer_view_t *v
     /* Recreate canvas at the new size (reuses SDRAM buffer) */
     lv_color_t *canvas_buf = (lv_color_t *)EIT_SDRAM_CANVAS_BUF_ADDR;
     lv_canvas_set_buffer(view->canvas, canvas_buf, new_size, new_size, LV_COLOR_FORMAT_RGB565);
-    lv_canvas_fill_bg(view->canvas, lv_color_hex(0x000000), LV_OPA_COVER);
+    lv_canvas_fill_bg(view->canvas, lv_color_hex(COL_BG), LV_OPA_COVER);
     lv_obj_align(view->canvas, LV_ALIGN_CENTER, -30, 20);
 
     /* Force overlay recomputation */

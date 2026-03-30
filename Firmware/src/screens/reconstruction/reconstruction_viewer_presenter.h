@@ -4,7 +4,6 @@
 #include "reconstruction_viewer_view.h"
 
 #include "algorithms/lbp_reconstruction.h"
-#include "algorithms/dbar_reconstruction.h"
 #include "services/eit_acquisition.h"
 
 #include "ff.h"

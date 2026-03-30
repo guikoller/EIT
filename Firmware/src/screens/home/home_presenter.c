@@ -26,9 +26,3 @@ void home_presenter_on_settings(void *ctx)
     evt.type = APP_EVENT_OPEN_SETTINGS;
     app_coordinator_post_event(&evt);
 }
-
-void home_presenter_on_about(void *ctx)
-{
-    /* About is handled entirely by the view overlay — nothing to do here */
-    (void)ctx;
-}

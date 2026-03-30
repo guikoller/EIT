@@ -3,12 +3,16 @@
 #include <string.h>
 #include <stdio.h>
 
-/* ---- Colour palette ---- */
-#define COL_BG          0x0a0a0a
+/* ---- Light theme color palette ---- */
+#define COL_BG          0xf5f5f5
 #define COL_ACCENT      0x4a9fd8
-#define COL_CARD        0x1a1a1a
+#define COL_CARD        0xffffff
+#define COL_CARD_BORDER 0xe0e0e0
 #define COL_BTN         0x2a7da8
-#define COL_LABEL       0x888888
+#define COL_LABEL       0x666666
+#define COL_TEXT        0x333333
+#define COL_DROPDOWN_BG 0xffffff
+#define COL_DROPDOWN_BD 0xe0e0e0
 
 /* ---- Image-size option list (must match index_to_size / size_to_index) ---- */
 static const char *IMAGE_SIZE_OPTIONS = "16\n32\n64";
@@ -64,7 +68,7 @@ static void datatable_changed(lv_event_t *e)
 {
     settings_view_t *v = (settings_view_t *)lv_event_get_user_data(e);
     if (!v) return;
-    uint8_t checked = lv_obj_has_state(v->cb_data_table, LV_STATE_CHECKED) ? 1u : 0u;
+    uint8_t checked = lv_obj_has_state(v->sw_data_table, LV_STATE_CHECKED) ? 1u : 0u;
     if (v->bindings.on_show_data_table)
         v->bindings.on_show_data_table(v->bindings.ctx, checked);
 }
@@ -103,7 +107,7 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     memset(view, 0, sizeof(*view));
     if (bindings) view->bindings = *bindings;
 
-    /* Full-screen container */
+    /* Full-screen container - light background */
     view->cont = lv_obj_create(parent);
     lv_obj_set_size(view->cont, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_style_bg_color(view->cont, lv_color_hex(COL_BG), 0);
@@ -120,12 +124,15 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
 
     /* ---- Card area ---- */
     lv_obj_t *card = lv_obj_create(view->cont);
-    lv_obj_set_size(card, 700, 480);
-    lv_obj_align(card, LV_ALIGN_CENTER, 0, 5);
+    lv_obj_set_size(card, 700, 340);
+    lv_obj_align(card, LV_ALIGN_TOP_MID, 0, 60);
     lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
-    lv_obj_set_style_border_color(card, lv_color_hex(0x3a3a3a), 0);
-    lv_obj_set_style_border_width(card, 2, 0);
-    lv_obj_set_style_radius(card, 10, 0);
+    lv_obj_set_style_border_color(card, lv_color_hex(COL_CARD_BORDER), 0);
+    lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_set_style_radius(card, 12, 0);
+    lv_obj_set_style_shadow_width(card, 8, 0);
+    lv_obj_set_style_shadow_color(card, lv_color_hex(0xdddddd), 0);
+    lv_obj_set_style_shadow_ofs_y(card, 4, 0);
     lv_obj_set_style_pad_all(card, 25, 0);
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -134,7 +141,7 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     /* ---- Row 1: Algorithm ---- */
     lv_obj_t *row1 = lv_obj_create(card);
     lv_obj_set_size(row1, LV_PCT(100), LV_SIZE_CONTENT);
-    lv_obj_set_style_min_height(row1, 60, 0);
+    lv_obj_set_style_min_height(row1, 55, 0);
     lv_obj_set_style_bg_opa(row1, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(row1, 0, 0);
     lv_obj_set_style_pad_all(row1, 0, 0);
@@ -142,18 +149,20 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     make_section_label(row1, "Algorithm", LV_ALIGN_LEFT_MID, 0, 0);
 
     view->dd_algorithm = lv_dropdown_create(row1);
-    lv_dropdown_set_options(view->dd_algorithm, "LBP\nD-Bar");
-    lv_obj_set_size(view->dd_algorithm, 280, 50);
+    lv_dropdown_set_options(view->dd_algorithm, "LBP");
+    lv_obj_set_size(view->dd_algorithm, 280, 48);
     lv_obj_align(view->dd_algorithm, LV_ALIGN_RIGHT_MID, 0, 0);
-    lv_obj_set_style_bg_color(view->dd_algorithm, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_text_color(view->dd_algorithm, lv_color_white(), 0);
-    lv_obj_set_style_text_font(view->dd_algorithm, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_bg_color(view->dd_algorithm, lv_color_hex(COL_DROPDOWN_BG), 0);
+    lv_obj_set_style_border_color(view->dd_algorithm, lv_color_hex(COL_DROPDOWN_BD), 0);
+    lv_obj_set_style_border_width(view->dd_algorithm, 1, 0);
+    lv_obj_set_style_text_color(view->dd_algorithm, lv_color_hex(COL_TEXT), 0);
+    lv_obj_set_style_text_font(view->dd_algorithm, &lv_font_montserrat_14, 0);
     lv_obj_add_event_cb(view->dd_algorithm, algo_changed, LV_EVENT_VALUE_CHANGED, view);
 
     /* ---- Row 2: Image Size ---- */
     lv_obj_t *row2 = lv_obj_create(card);
     lv_obj_set_size(row2, LV_PCT(100), LV_SIZE_CONTENT);
-    lv_obj_set_style_min_height(row2, 60, 0);
+    lv_obj_set_style_min_height(row2, 55, 0);
     lv_obj_set_style_bg_opa(row2, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(row2, 0, 0);
     lv_obj_set_style_pad_all(row2, 0, 0);
@@ -162,38 +171,44 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
 
     view->dd_image_size = lv_dropdown_create(row2);
     lv_dropdown_set_options(view->dd_image_size, IMAGE_SIZE_OPTIONS);
-    lv_obj_set_size(view->dd_image_size, 280, 50);
+    lv_obj_set_size(view->dd_image_size, 280, 48);
     lv_obj_align(view->dd_image_size, LV_ALIGN_RIGHT_MID, 0, 0);
-    lv_obj_set_style_bg_color(view->dd_image_size, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_text_color(view->dd_image_size, lv_color_white(), 0);
-    lv_obj_set_style_text_font(view->dd_image_size, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_bg_color(view->dd_image_size, lv_color_hex(COL_DROPDOWN_BG), 0);
+    lv_obj_set_style_border_color(view->dd_image_size, lv_color_hex(COL_DROPDOWN_BD), 0);
+    lv_obj_set_style_border_width(view->dd_image_size, 1, 0);
+    lv_obj_set_style_text_color(view->dd_image_size, lv_color_hex(COL_TEXT), 0);
+    lv_obj_set_style_text_font(view->dd_image_size, &lv_font_montserrat_14, 0);
     lv_obj_add_event_cb(view->dd_image_size, imgsize_changed, LV_EVENT_VALUE_CHANGED, view);
 
     /* ---- Row 3: Show Data Table ---- */
     lv_obj_t *row3 = lv_obj_create(card);
     lv_obj_set_size(row3, LV_PCT(100), LV_SIZE_CONTENT);
-    lv_obj_set_style_min_height(row3, 110, 0);
+    lv_obj_set_style_min_height(row3, 55, 0);
     lv_obj_set_style_bg_opa(row3, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(row3, 0, 0);
     lv_obj_set_style_pad_all(row3, 0, 0);
 
     make_section_label(row3, "Show Data Table", LV_ALIGN_LEFT_MID, 0, 0);
 
-    view->cb_data_table = lv_checkbox_create(row3);
-    lv_checkbox_set_text(view->cb_data_table, "");
-    lv_obj_align(view->cb_data_table, LV_ALIGN_RIGHT_MID, 0, 0);
-    lv_obj_set_style_pad_column(view->cb_data_table, 10, 0);
-    lv_obj_set_size(view->cb_data_table, 100, 100);
-    lv_obj_set_style_bg_color(view->cb_data_table, lv_color_hex(COL_ACCENT), LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_set_style_min_width(view->cb_data_table, 80, LV_PART_INDICATOR);
-    lv_obj_set_style_min_height(view->cb_data_table, 80, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(view->cb_data_table, 8, LV_PART_INDICATOR);
-    lv_obj_add_event_cb(view->cb_data_table, datatable_changed, LV_EVENT_VALUE_CHANGED, view);
+    view->sw_data_table = lv_switch_create(row3);
+    lv_obj_set_size(view->sw_data_table, 60, 32);
+    lv_obj_align(view->sw_data_table, LV_ALIGN_RIGHT_MID, 0, 0);
+    /* Switch styling - off state */
+    lv_obj_set_style_bg_color(view->sw_data_table, lv_color_hex(COL_DROPDOWN_BG), LV_PART_MAIN);
+    lv_obj_set_style_border_color(view->sw_data_table, lv_color_hex(COL_DROPDOWN_BD), LV_PART_MAIN);
+    lv_obj_set_style_border_width(view->sw_data_table, 1, LV_PART_MAIN);
+    /* Switch styling - on state */
+    lv_obj_set_style_bg_color(view->sw_data_table, lv_color_hex(COL_ACCENT), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    /* Knob styling */
+    lv_obj_set_style_bg_color(view->sw_data_table, lv_color_white(), LV_PART_KNOB);
+    lv_obj_set_style_shadow_width(view->sw_data_table, 2, LV_PART_KNOB);
+    lv_obj_set_style_shadow_color(view->sw_data_table, lv_color_hex(0xcccccc), LV_PART_KNOB);
+    lv_obj_add_event_cb(view->sw_data_table, datatable_changed, LV_EVENT_VALUE_CHANGED, view);
 
     /* ---- Row 4: Calibrate ---- */
     lv_obj_t *row4 = lv_obj_create(card);
     lv_obj_set_size(row4, LV_PCT(100), LV_SIZE_CONTENT);
-    lv_obj_set_style_min_height(row4, 60, 0);
+    lv_obj_set_style_min_height(row4, 55, 0);
     lv_obj_set_style_bg_opa(row4, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(row4, 0, 0);
     lv_obj_set_style_pad_all(row4, 0, 0);
@@ -201,22 +216,25 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     make_section_label(row4, "Calibrate", LV_ALIGN_LEFT_MID, 0, 0);
 
     view->btn_calibrate = lv_button_create(row4);
-    lv_obj_set_size(view->btn_calibrate, 280, 50);
+    lv_obj_set_size(view->btn_calibrate, 280, 48);
     lv_obj_align(view->btn_calibrate, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_set_style_bg_color(view->btn_calibrate, lv_color_hex(COL_BTN), 0);
     lv_obj_set_style_radius(view->btn_calibrate, 8, 0);
+    lv_obj_set_style_shadow_width(view->btn_calibrate, 4, 0);
+    lv_obj_set_style_shadow_color(view->btn_calibrate, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(view->btn_calibrate, 2, 0);
     lv_obj_add_event_cb(view->btn_calibrate, calibrate_clicked, LV_EVENT_CLICKED, view);
 
     lv_obj_t *cal_lbl = lv_label_create(view->btn_calibrate);
     lv_label_set_text(cal_lbl, LV_SYMBOL_REFRESH "  CALIBRATE");
     lv_obj_set_style_text_color(cal_lbl, lv_color_white(), 0);
-    lv_obj_set_style_text_font(cal_lbl, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_font(cal_lbl, &lv_font_montserrat_14, 0);
     lv_obj_center(cal_lbl);
 
     /* ---- Row 5: Batch Process ---- */
     lv_obj_t *row5 = lv_obj_create(card);
     lv_obj_set_size(row5, LV_PCT(100), LV_SIZE_CONTENT);
-    lv_obj_set_style_min_height(row5, 60, 0);
+    lv_obj_set_style_min_height(row5, 55, 0);
     lv_obj_set_style_bg_opa(row5, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(row5, 0, 0);
     lv_obj_set_style_pad_all(row5, 0, 0);
@@ -224,44 +242,50 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     make_section_label(row5, "Batch Process", LV_ALIGN_LEFT_MID, 0, 0);
 
     view->btn_batch = lv_button_create(row5);
-    lv_obj_set_size(view->btn_batch, 280, 50);
+    lv_obj_set_size(view->btn_batch, 280, 48);
     lv_obj_align(view->btn_batch, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_set_style_bg_color(view->btn_batch, lv_color_hex(COL_BTN), 0);
     lv_obj_set_style_radius(view->btn_batch, 8, 0);
+    lv_obj_set_style_shadow_width(view->btn_batch, 4, 0);
+    lv_obj_set_style_shadow_color(view->btn_batch, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(view->btn_batch, 2, 0);
     lv_obj_add_event_cb(view->btn_batch, batch_clicked, LV_EVENT_CLICKED, view);
 
     lv_obj_t *batch_lbl = lv_label_create(view->btn_batch);
     lv_label_set_text(batch_lbl, LV_SYMBOL_DOWNLOAD "  BATCH PROCESS");
     lv_obj_set_style_text_color(batch_lbl, lv_color_white(), 0);
-    lv_obj_set_style_text_font(batch_lbl, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_font(batch_lbl, &lv_font_montserrat_14, 0);
     lv_obj_center(batch_lbl);
 
-    /* Calibration status label (below card, above back button) */
+    /* Calibration status label */
     view->label_calib_status = lv_label_create(view->cont);
     lv_label_set_text(view->label_calib_status, "");
     lv_obj_set_style_text_color(view->label_calib_status, lv_color_hex(COL_ACCENT), 0);
     lv_obj_set_style_text_font(view->label_calib_status, &lv_font_montserrat_14, 0);
-    lv_obj_align(view->label_calib_status, LV_ALIGN_BOTTOM_MID, 0, -72);
+    lv_obj_align(view->label_calib_status, LV_ALIGN_BOTTOM_MID, 0, -75);
 
-    /* Batch status label (shares area with calib status, slightly higher) */
+    /* Batch status label */
     view->label_batch_status = lv_label_create(view->cont);
     lv_label_set_text(view->label_batch_status, "");
     lv_obj_set_style_text_color(view->label_batch_status, lv_color_hex(COL_ACCENT), 0);
     lv_obj_set_style_text_font(view->label_batch_status, &lv_font_montserrat_14, 0);
-    lv_obj_align(view->label_batch_status, LV_ALIGN_BOTTOM_MID, 0, -90);
+    lv_obj_align(view->label_batch_status, LV_ALIGN_BOTTOM_MID, 0, -95);
 
     /* ---- Back button ---- */
     view->btn_back = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_back, 200, 56);
-    lv_obj_align(view->btn_back, LV_ALIGN_BOTTOM_MID, 0, -12);
+    lv_obj_set_size(view->btn_back, 200, 55);
+    lv_obj_align(view->btn_back, LV_ALIGN_BOTTOM_MID, 0, -15);
     lv_obj_set_style_bg_color(view->btn_back, lv_color_hex(COL_BTN), 0);
     lv_obj_set_style_radius(view->btn_back, 8, 0);
+    lv_obj_set_style_shadow_width(view->btn_back, 4, 0);
+    lv_obj_set_style_shadow_color(view->btn_back, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(view->btn_back, 2, 0);
     lv_obj_add_event_cb(view->btn_back, back_clicked, LV_EVENT_CLICKED, view);
 
     lv_obj_t *lbl = lv_label_create(view->btn_back);
     lv_label_set_text(lbl, LV_SYMBOL_LEFT "  BACK");
     lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
-    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, 0);
     lv_obj_center(lbl);
 }
 
@@ -278,11 +302,11 @@ void settings_view_set_values(settings_view_t *view,
     if (view->dd_image_size)
         lv_dropdown_set_selected(view->dd_image_size, size_to_index(image_size));
 
-    if (view->cb_data_table) {
+    if (view->sw_data_table) {
         if (show_data_table)
-            lv_obj_add_state(view->cb_data_table, LV_STATE_CHECKED);
+            lv_obj_add_state(view->sw_data_table, LV_STATE_CHECKED);
         else
-            lv_obj_clear_state(view->cb_data_table, LV_STATE_CHECKED);
+            lv_obj_clear_state(view->sw_data_table, LV_STATE_CHECKED);
     }
 }
 
