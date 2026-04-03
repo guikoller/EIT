@@ -14,6 +14,9 @@ typedef struct {
 void home_presenter_init(home_presenter_t *p, home_view_t *v);
 void home_presenter_on_start(void *ctx);
 void home_presenter_on_settings(void *ctx);
+void home_presenter_on_nav_home(void *ctx);
+void home_presenter_on_nav_eit(void *ctx);
+void home_presenter_on_nav_settings(void *ctx);
 
 #ifdef __cplusplus
 }

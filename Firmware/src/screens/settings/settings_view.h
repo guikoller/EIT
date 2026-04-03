@@ -3,6 +3,7 @@
 
 #include "lvgl/lvgl.h"
 #include "eit_config.h"
+#include "screens/common/left_menu.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,15 +17,21 @@ typedef void (*settings_bool_cb_t)(void *ctx, uint8_t value);
 typedef struct {
     void               *ctx;
     settings_cb_t       on_back;
+    settings_cb_t       on_nav_home;
+    settings_cb_t       on_nav_eit;
+    settings_cb_t       on_nav_settings;
     settings_algo_cb_t  on_algorithm;
     settings_imgsize_cb_t on_image_size;
     settings_bool_cb_t  on_show_data_table;
     settings_cb_t       on_calibrate;
     settings_cb_t       on_batch;
+    settings_cb_t       on_wifi;
 } settings_view_bindings_t;
 
 typedef struct {
     lv_obj_t *cont;
+    lv_obj_t *content;
+    left_menu_t menu;
     lv_obj_t *label_title;
 
     /* Algorithm dropdown */
@@ -43,6 +50,9 @@ typedef struct {
     /* Batch process button + status */
     lv_obj_t *btn_batch;
     lv_obj_t *label_batch_status;
+
+    /* WiFi settings button */
+    lv_obj_t *btn_wifi;
 
     /* Back button */
     lv_obj_t *btn_back;

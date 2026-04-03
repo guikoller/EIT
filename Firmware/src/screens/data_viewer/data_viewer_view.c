@@ -18,13 +18,10 @@ static void style_table(lv_obj_t *table)
     lv_obj_set_style_border_color(table, lv_color_hex(0x555555), LV_PART_ITEMS);
 }
 
-static void return_btn_clicked(lv_event_t *e)
+static void nav_return_clicked(void *ctx)
 {
-    data_viewer_view_t *view = (data_viewer_view_t *)lv_event_get_user_data(e);
+    data_viewer_view_t *view = (data_viewer_view_t *)ctx;
     if (!view) return;
-
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code != LV_EVENT_CLICKED) return;
 
     if (view->bindings.on_return) {
         view->bindings.on_return(view->bindings.ctx);
@@ -57,6 +54,30 @@ static void tab_changed_event_cb(lv_event_t *e)
     }
 }
 
+static void nav_home_clicked(void *ctx)
+{
+    data_viewer_view_t *view = (data_viewer_view_t *)ctx;
+    if (view && view->bindings.on_nav_home) {
+        view->bindings.on_nav_home(view->bindings.ctx);
+    }
+}
+
+static void nav_eit_clicked(void *ctx)
+{
+    data_viewer_view_t *view = (data_viewer_view_t *)ctx;
+    if (view && view->bindings.on_nav_eit) {
+        view->bindings.on_nav_eit(view->bindings.ctx);
+    }
+}
+
+static void nav_settings_clicked(void *ctx)
+{
+    data_viewer_view_t *view = (data_viewer_view_t *)ctx;
+    if (view && view->bindings.on_nav_settings) {
+        view->bindings.on_nav_settings(view->bindings.ctx);
+    }
+}
+
 void data_viewer_view_create(data_viewer_view_t *view, lv_obj_t *parent, const data_viewer_view_bindings_t *bindings)
 {
     if (!view || !parent) return;
@@ -76,14 +97,31 @@ void data_viewer_view_create(data_viewer_view_t *view, lv_obj_t *parent, const d
     lv_obj_remove_flag(view->cont, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_align(view->cont, LV_ALIGN_TOP_LEFT, 0, 0);
 
-    view->label_title = lv_label_create(view->cont);
+    left_menu_bindings_t menu_bindings;
+    memset(&menu_bindings, 0, sizeof(menu_bindings));
+    menu_bindings.ctx = view;
+    menu_bindings.on_home = nav_home_clicked;
+    menu_bindings.on_eit = nav_eit_clicked;
+    menu_bindings.on_settings = nav_settings_clicked;
+    menu_bindings.on_return = nav_return_clicked;
+    left_menu_create(&view->menu, view->cont, LEFT_MENU_ITEM_EIT, &menu_bindings);
+
+    view->content = lv_obj_create(view->cont);
+    lv_obj_set_size(view->content, left_menu_content_width(), LV_VER_RES);
+    lv_obj_align(view->content, LV_ALIGN_TOP_LEFT, left_menu_content_x(), 0);
+    lv_obj_set_style_bg_color(view->content, lv_color_hex(0x0a0a0a), 0);
+    lv_obj_set_style_border_width(view->content, 0, 0);
+    lv_obj_set_style_pad_all(view->content, 0, 0);
+    lv_obj_remove_flag(view->content, LV_OBJ_FLAG_SCROLLABLE);
+
+    view->label_title = lv_label_create(view->content);
     lv_label_set_text(view->label_title, "");
     lv_obj_set_style_text_color(view->label_title, lv_color_hex(0x4a9fd8), 0);
     lv_obj_set_style_text_font(view->label_title, &lv_font_montserrat_22, 0);
     lv_obj_align(view->label_title, LV_ALIGN_TOP_MID, 0, 10);
 
-    view->tabview = lv_tabview_create(view->cont);
-    lv_obj_set_size(view->tabview, LV_HOR_RES - 20, LV_VER_RES - 140);
+    view->tabview = lv_tabview_create(view->content);
+    lv_obj_set_size(view->tabview, left_menu_content_width() - 24, LV_VER_RES - 140);
     lv_obj_align(view->tabview, LV_ALIGN_TOP_MID, 0, 40);
     lv_obj_set_style_bg_color(view->tabview, lv_color_hex(0x0a0a0a), 0);
     lv_tabview_set_tab_bar_position(view->tabview, LV_DIR_TOP);
@@ -112,21 +150,11 @@ void data_viewer_view_create(data_viewer_view_t *view, lv_obj_t *parent, const d
 
     lv_obj_add_event_cb(view->tabview, tab_changed_event_cb, LV_EVENT_VALUE_CHANGED, view);
 
-    view->btn_return = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_return, 150, 50);
-    lv_obj_align(view->btn_return, LV_ALIGN_BOTTOM_LEFT, 25, -10);
-    lv_obj_set_style_bg_color(view->btn_return, lv_color_hex(0x666666), 0);
-    lv_obj_set_style_radius(view->btn_return, 5, 0);
-    lv_obj_add_event_cb(view->btn_return, return_btn_clicked, LV_EVENT_CLICKED, view);
+    view->btn_return = NULL;
 
-    lv_obj_t *label_return = lv_label_create(view->btn_return);
-    lv_label_set_text(label_return, LV_SYMBOL_LEFT " RETURN");
-    lv_obj_set_style_text_color(label_return, lv_color_white(), 0);
-    lv_obj_center(label_return);
-
-    view->btn_run = lv_button_create(view->cont);
-    lv_obj_set_size(view->btn_run, 150, 50);
-    lv_obj_align(view->btn_run, LV_ALIGN_BOTTOM_RIGHT, -25, -10);
+    view->btn_run = lv_button_create(view->content);
+    lv_obj_set_size(view->btn_run, 160, 50);
+    lv_obj_align(view->btn_run, LV_ALIGN_BOTTOM_RIGHT, -18, -10);
     lv_obj_set_style_bg_color(view->btn_run, lv_color_hex(0x2a7da8), 0);
     lv_obj_set_style_radius(view->btn_run, 5, 0);
     lv_obj_add_event_cb(view->btn_run, run_btn_clicked, LV_EVENT_CLICKED, view);
@@ -137,7 +165,6 @@ void data_viewer_view_create(data_viewer_view_t *view, lv_obj_t *parent, const d
     lv_obj_center(label_run);
 
     /* Keep action buttons above tab content so they always receive taps */
-    lv_obj_move_foreground(view->btn_return);
     lv_obj_move_foreground(view->btn_run);
 }
 

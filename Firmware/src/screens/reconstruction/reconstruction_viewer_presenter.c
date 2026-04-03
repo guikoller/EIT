@@ -2,7 +2,11 @@
 
 #include "app/app_coordinator.h"
 #include "services/eit_acq_simulated.h"
+#include "services/json_encoder.h"
+#include "services/wifi/wifi_service.h"
 #include "eit_config.h"
+
+#include "stm32f7xx_hal.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -36,6 +40,7 @@ static void presenter_cleanup(reconstruction_viewer_presenter_t *p)
 
     memset(&p->ref_frame, 0, sizeof(p->ref_frame));
     p->is_playing = 0;
+    p->send_pending = 0;
 }
 
 static void recon_return_async_cb(void *user_data)
@@ -47,6 +52,42 @@ static void recon_return_async_cb(void *user_data)
 
     app_event_t evt;
     evt.type = APP_EVENT_OPEN_BROWSER;
+    app_coordinator_post_event(&evt);
+}
+
+static void recon_nav_home_async_cb(void *user_data)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)user_data;
+    if (!p) return;
+
+    presenter_cleanup(p);
+
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_HOME;
+    app_coordinator_post_event(&evt);
+}
+
+static void recon_nav_eit_async_cb(void *user_data)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)user_data;
+    if (!p) return;
+
+    presenter_cleanup(p);
+
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_BROWSER;
+    app_coordinator_post_event(&evt);
+}
+
+static void recon_nav_settings_async_cb(void *user_data)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)user_data;
+    if (!p) return;
+
+    presenter_cleanup(p);
+
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_SETTINGS;
     app_coordinator_post_event(&evt);
 }
 
@@ -568,6 +609,7 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
     }
 
     reconstruction_viewer_view_set_save_enabled(presenter->view, 1);
+    reconstruction_viewer_view_set_send_enabled(presenter->view, 1);
 
     /* Create acquisition timer (initially paused — press PLAY to start loop) */
     presenter->acq_timer = lv_timer_create(acq_timer_cb, 0, presenter);
@@ -644,4 +686,234 @@ void reconstruction_viewer_presenter_on_noise_level(void *ctx, int32_t level)
         eit_acq_simulated_set_noise(p->acq_backend, p->noise_enabled, p->noise_level_pct);
     }
     reconstruction_viewer_view_set_noise_level(p->view, level);
+}
+
+/**
+ * Build EIT measurement data as JSON and save to SD card.
+ */
+static int build_and_save_json(reconstruction_viewer_presenter_t *p)
+{
+    if (!p || !p->view) return 0;
+
+    /* Force a frame acquisition if needed (when paused) */
+    eit_acquisition_start_frame();
+
+    /* Poll until frame is ready (with timeout) */
+    uint32_t start = HAL_GetTick();
+    eit_acq_status_t status;
+    do {
+        status = eit_acquisition_poll();
+        if (status.state == EIT_ACQ_FRAME_READY) break;
+        if (HAL_GetTick() - start > 1000) break;  /* 1s timeout */
+    } while (status.state == EIT_ACQ_INJECTING || status.state == EIT_ACQ_MEASURING);
+
+    /* Get current frame data */
+    eit_frame_t current_frame;
+    if (!eit_acquisition_get_frame(&current_frame)) {
+        reconstruction_viewer_view_set_status(p->view, "RECORD ERROR: no frame available");
+        return 0;
+    }
+
+    /* Generate unique JSON filename */
+    if (!make_unique_path(p->recorded_json_path, sizeof(p->recorded_json_path),
+                          p->current_filename, "json")) {
+        reconstruction_viewer_view_set_status(p->view, "RECORD ERROR: filename");
+        return 0;
+    }
+
+    /* Use SDRAM buffer for JSON */
+    char *json_buf = (char *)EIT_SDRAM_JSON_BUF_ADDR;
+    json_encoder_t enc;
+    json_init(&enc, json_buf, EIT_SDRAM_JSON_BUF_SIZE);
+
+    /* Build JSON structure */
+    json_object_start(&enc);
+
+    /* Device info */
+    json_key_string(&enc, "device_id", "EIT-F769-001");
+    json_key_uint(&enc, "timestamp", HAL_GetTick() / 1000);
+    json_key_uint(&enc, "frame_number", current_frame.frame_number);
+
+    /* Configuration */
+    json_key_object(&enc, "config");
+    json_key_uint(&enc, "n_electrodes", EIT_NUM_ELECTRODES);
+    json_key_uint(&enc, "n_meas", current_frame.n_meas);
+    json_key_uint(&enc, "n_inj", current_frame.n_inj);
+    json_key_uint(&enc, "image_size", EIT_IMAGE_SIZE);
+    json_object_end(&enc);
+
+    /* Source file */
+    json_key_string(&enc, "source_file", p->current_filename);
+
+    /* Measurements - voltage data array */
+    json_key_object(&enc, "measurements");
+    uint32_t uel_count = (uint32_t)current_frame.n_meas * current_frame.n_inj;
+    json_key_uint(&enc, "uel_count", uel_count);
+    json_key_array(&enc, "uel");
+    for (uint32_t i = 0; i < uel_count; i++) {
+        json_float(&enc, current_frame.uel[i]);
+    }
+    json_array_end(&enc);
+    json_object_end(&enc);
+
+    /* Reconstruction metadata (if available) */
+    if (p->recon_result && p->recon_result->success) {
+        json_key_object(&enc, "reconstruction");
+        json_key_string(&enc, "algorithm", "LBP");
+        json_key_float(&enc, "vmin", p->recon_result->vmin);
+        json_key_float(&enc, "vmax", p->recon_result->vmax);
+        json_object_end(&enc);
+    }
+
+    json_object_end(&enc);
+
+    /* Check for JSON encoding errors */
+    if (json_has_error(&enc)) {
+        reconstruction_viewer_view_set_status(p->view, "RECORD ERROR: JSON overflow");
+        return 0;
+    }
+
+    /* Save to SD card */
+    FIL fil;
+    FRESULT res = f_open(&fil, p->recorded_json_path, FA_CREATE_ALWAYS | FA_WRITE);
+    if (res != FR_OK) {
+        char err[64];
+        snprintf(err, sizeof(err), "RECORD ERROR: open r%u", (unsigned)res);
+        reconstruction_viewer_view_set_status(p->view, err);
+        return 0;
+    }
+
+    size_t json_len = json_get_length(&enc);
+    UINT bw = 0;
+    res = f_write(&fil, json_buf, (UINT)json_len, &bw);
+    f_close(&fil);
+
+    if (res != FR_OK || bw != (UINT)json_len) {
+        char err[64];
+        snprintf(err, sizeof(err), "RECORD ERROR: write r%u", (unsigned)res);
+        reconstruction_viewer_view_set_status(p->view, err);
+        return 0;
+    }
+
+    return 1;
+}
+
+static void send_async_cb(void *user_data)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)user_data;
+    if (!p || !p->view) return;
+
+    if (!p->has_recorded_data) {
+        if (!build_and_save_json(p)) {
+            p->send_pending = 0;
+            reconstruction_viewer_view_set_send_enabled(p->view, 1);
+            return;
+        }
+        p->has_recorded_data = 1;
+    }
+
+    if (wifi_service_init() != 0) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "SEND ERROR: %s", wifi_service_last_error());
+        reconstruction_viewer_view_set_status(p->view, msg);
+        p->send_pending = 0;
+        reconstruction_viewer_view_set_send_enabled(p->view, 1);
+        return;
+    }
+
+    if (wifi_service_send_json_file(p->recorded_json_path,
+                                    p->send_reply,
+                                    sizeof(p->send_reply)) != 0) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "SEND ERROR: %s", wifi_service_last_error());
+        reconstruction_viewer_view_set_status(p->view, msg);
+        p->send_pending = 0;
+        reconstruction_viewer_view_set_send_enabled(p->view, 1);
+        return;
+    }
+
+    {
+        char msg[96];
+        const char *fn = p->recorded_json_path;
+        if (strncmp(fn, "0:/", 3) == 0) fn += 3;
+        snprintf(msg, sizeof(msg), "Sent: %s", fn);
+        reconstruction_viewer_view_set_status(p->view, msg);
+    }
+
+    p->send_pending = 0;
+    reconstruction_viewer_view_set_send_enabled(p->view, 1);
+}
+
+void reconstruction_viewer_presenter_on_record(void *ctx)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
+    if (!p || !p->view) return;
+
+    /* Auto-pause acquisition during record */
+    if (p->is_playing && p->acq_timer) {
+        p->is_playing = 0;
+        lv_timer_pause(p->acq_timer);
+        reconstruction_viewer_view_set_play_state(p->view, 0);
+    }
+
+    /* Disable button during operation */
+    reconstruction_viewer_view_set_record_enabled(p->view, 0);
+    reconstruction_viewer_view_set_status(p->view, "Recording...");
+
+    /* Build and save JSON */
+    if (build_and_save_json(p)) {
+        p->has_recorded_data = 1;
+
+        /* Show success message with filename (skip "0:/" prefix) */
+        char msg[96];
+        const char *fn = p->recorded_json_path;
+        if (strncmp(fn, "0:/", 3) == 0) fn += 3;
+        snprintf(msg, sizeof(msg), "Recorded: %s", fn);
+        reconstruction_viewer_view_set_status(p->view, msg);
+    }
+
+    /* Re-enable button */
+    reconstruction_viewer_view_set_record_enabled(p->view, 1);
+}
+
+void reconstruction_viewer_presenter_on_send(void *ctx)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
+    if (!p || !p->view || p->send_pending) return;
+
+    if (p->is_playing && p->acq_timer) {
+        p->is_playing = 0;
+        lv_timer_pause(p->acq_timer);
+        reconstruction_viewer_view_set_play_state(p->view, 0);
+    }
+
+    p->send_pending = 1;
+    reconstruction_viewer_view_set_send_enabled(p->view, 0);
+    reconstruction_viewer_view_set_status(p->view, "Sending JSON...");
+
+    lv_async_call(send_async_cb, p);
+}
+
+void reconstruction_viewer_presenter_on_nav_home(void *ctx)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
+    if (!p) return;
+
+    lv_async_call(recon_nav_home_async_cb, p);
+}
+
+void reconstruction_viewer_presenter_on_nav_eit(void *ctx)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
+    if (!p) return;
+
+    lv_async_call(recon_nav_eit_async_cb, p);
+}
+
+void reconstruction_viewer_presenter_on_nav_settings(void *ctx)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
+    if (!p) return;
+
+    lv_async_call(recon_nav_settings_async_cb, p);
 }

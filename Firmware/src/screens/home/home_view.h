@@ -2,6 +2,7 @@
 #define HOME_VIEW_H
 
 #include "lvgl/lvgl.h"
+#include "screens/common/left_menu.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,10 +14,15 @@ typedef struct {
     void           *ctx;
     home_menu_cb_t  on_start;
     home_menu_cb_t  on_settings;
+    home_menu_cb_t  on_nav_home;
+    home_menu_cb_t  on_nav_eit;
+    home_menu_cb_t  on_nav_settings;
 } home_view_bindings_t;
 
 typedef struct {
     lv_obj_t *cont;
+    lv_obj_t *content;
+    left_menu_t menu;
     lv_obj_t *img_logo;
     lv_obj_t *label_title;
     lv_obj_t *label_subtitle;

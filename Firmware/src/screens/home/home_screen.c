@@ -18,6 +18,9 @@ void home_screen_create(void)
     bindings.ctx         = &s_presenter;
     bindings.on_start    = home_presenter_on_start;
     bindings.on_settings = home_presenter_on_settings;
+    bindings.on_nav_home = home_presenter_on_nav_home;
+    bindings.on_nav_eit = home_presenter_on_nav_eit;
+    bindings.on_nav_settings = home_presenter_on_nav_settings;
 
     home_view_create(&s_view, lv_screen_active(), &bindings);
 }

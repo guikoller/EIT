@@ -2,6 +2,7 @@
 #define DATA_VIEWER_VIEW_H
 
 #include "lvgl.h"
+#include "screens/common/left_menu.h"
 
 #include <stdint.h>
 
@@ -18,10 +19,15 @@ typedef struct {
     data_viewer_on_return_cb_t on_return;
     data_viewer_on_run_cb_t on_run;
     data_viewer_on_tab_changed_cb_t on_tab_changed;
+    data_viewer_on_return_cb_t on_nav_home;
+    data_viewer_on_return_cb_t on_nav_eit;
+    data_viewer_on_return_cb_t on_nav_settings;
 } data_viewer_view_bindings_t;
 
 typedef struct {
     lv_obj_t *cont;
+    lv_obj_t *content;
+    left_menu_t menu;
     lv_obj_t *tabview;
     lv_obj_t *label_title;
     lv_obj_t *btn_return;

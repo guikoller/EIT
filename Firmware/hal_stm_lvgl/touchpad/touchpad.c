@@ -62,18 +62,19 @@ static void touchpad_read_cb(lv_indev_t * indev, lv_indev_data_t *data)
 	static int16_t last_y = 0;
 	BSP_TS_GetState(&TS_State);
 	if(TS_State.touchDetected != 0) {
-		/* Apply calibration offsets defined in eit_config.h */
-		int16_t raw_x = (int16_t)TS_State.touchX[0] - EIT_TOUCH_X_OFFSET;
-		int16_t raw_y = (int16_t)TS_State.touchY[0] - EIT_TOUCH_Y_OFFSET;
+		int16_t raw_x = (int16_t)TS_State.touchX[0];
+		int16_t raw_y = (int16_t)TS_State.touchY[0];
+		int16_t adj_x = (int16_t)(raw_x - (int16_t)EIT_TOUCH_X_OFFSET);
+		int16_t adj_y = (int16_t)(raw_y - (int16_t)EIT_TOUCH_Y_OFFSET);
 
 		/* Clamp to valid screen coordinates */
-		if(raw_x < 0) raw_x = 0;
-		if(raw_y < 0) raw_y = 0;
-		if(raw_x >= TFT_HOR_RES) raw_x = TFT_HOR_RES - 1;
-		if(raw_y >= TFT_VER_RES) raw_y = TFT_VER_RES - 1;
+		if(adj_x < 0) adj_x = 0;
+		if(adj_y < 0) adj_y = 0;
+		if(adj_x >= TFT_HOR_RES) adj_x = TFT_HOR_RES - 1;
+		if(adj_y >= TFT_VER_RES) adj_y = TFT_VER_RES - 1;
 
-		data->point.x = raw_x;
-		data->point.y = raw_y;
+		data->point.x = adj_x;
+		data->point.y = adj_y;
 		last_x = data->point.x;
 		last_y = data->point.y;
 		data->state = LV_INDEV_STATE_PR;

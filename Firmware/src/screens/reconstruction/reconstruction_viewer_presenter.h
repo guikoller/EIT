@@ -43,6 +43,12 @@ typedef struct {
     uint32_t save_bytes_written;
     uint32_t save_bytes_total;
     FRESULT save_last_res;
+
+    /* JSON recording state */
+    char recorded_json_path[64];
+    int has_recorded_data;
+    int send_pending;
+    char send_reply[256];
 } reconstruction_viewer_presenter_t;
 
 void reconstruction_viewer_presenter_init(reconstruction_viewer_presenter_t *presenter, reconstruction_viewer_view_t *view);
@@ -50,9 +56,14 @@ void reconstruction_viewer_presenter_on_create(reconstruction_viewer_presenter_t
 
 void reconstruction_viewer_presenter_on_return(void *ctx);
 void reconstruction_viewer_presenter_on_save(void *ctx);
+void reconstruction_viewer_presenter_on_record(void *ctx);
+void reconstruction_viewer_presenter_on_send(void *ctx);
 void reconstruction_viewer_presenter_on_play_pause(void *ctx);
 void reconstruction_viewer_presenter_on_noise_toggle(void *ctx);
 void reconstruction_viewer_presenter_on_noise_level(void *ctx, int32_t level);
+void reconstruction_viewer_presenter_on_nav_home(void *ctx);
+void reconstruction_viewer_presenter_on_nav_eit(void *ctx);
+void reconstruction_viewer_presenter_on_nav_settings(void *ctx);
 
 #ifdef __cplusplus
 }

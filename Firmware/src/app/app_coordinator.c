@@ -3,6 +3,7 @@
 #include "app_fsm.h"
 #include "screens/home/home_screen.h"
 #include "screens/settings/settings_screen.h"
+#include "screens/wifi_settings/wifi_settings_screen.h"
 #include "screens/data_viewer/data_viewer.h"
 #include "services/storage_service.h"
 #include "hal_stm_lvgl/tft/tft.h"
@@ -64,6 +65,11 @@ static void app_apply_requested_screen(void)
         case APP_SCREEN_SETTINGS:
             settings_screen_create();
             s_app.active_screen = APP_SCREEN_SETTINGS;
+            break;
+
+        case APP_SCREEN_WIFI_SETTINGS:
+            wifi_settings_screen_create();
+            s_app.active_screen = APP_SCREEN_WIFI_SETTINGS;
             break;
 
         case APP_SCREEN_BROWSER:

@@ -33,6 +33,9 @@ void data_viewer_presenter_on_create(data_viewer_presenter_t *presenter, const c
 void data_viewer_presenter_on_return(void *ctx);
 void data_viewer_presenter_on_run(void *ctx);
 void data_viewer_presenter_on_tab_changed(void *ctx, uint32_t tab_id);
+void data_viewer_presenter_on_nav_home(void *ctx);
+void data_viewer_presenter_on_nav_eit(void *ctx);
+void data_viewer_presenter_on_nav_settings(void *ctx);
 
 float **data_viewer_presenter_get_uel(data_viewer_presenter_t *presenter, uint16_t *out_n_meas, uint16_t *out_n_inj);
 

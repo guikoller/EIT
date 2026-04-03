@@ -26,3 +26,27 @@ void home_presenter_on_settings(void *ctx)
     evt.type = APP_EVENT_OPEN_SETTINGS;
     app_coordinator_post_event(&evt);
 }
+
+void home_presenter_on_nav_home(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_HOME;
+    app_coordinator_post_event(&evt);
+}
+
+void home_presenter_on_nav_eit(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_BROWSER;
+    app_coordinator_post_event(&evt);
+}
+
+void home_presenter_on_nav_settings(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_SETTINGS;
+    app_coordinator_post_event(&evt);
+}

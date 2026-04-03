@@ -44,6 +44,11 @@ void app_fsm_dispatch(app_state_t *state, const app_event_t *event)
             state->requested_screen = APP_SCREEN_SETTINGS;
             return;
 
+        case APP_EVENT_OPEN_WIFI_SETTINGS:
+            state->current_state = APP_STATE_WIFI_SETTINGS;
+            state->requested_screen = APP_SCREEN_WIFI_SETTINGS;
+            return;
+
         case APP_EVENT_OPEN_BROWSER:
             state->current_state = APP_STATE_BROWSER;
             state->requested_screen = APP_SCREEN_BROWSER;
@@ -80,6 +85,19 @@ void app_fsm_dispatch(app_state_t *state, const app_event_t *event)
 
         case APP_STATE_SETTINGS:
             if (event->type == APP_EVENT_BACK || event->type == APP_EVENT_OPEN_HOME) {
+                state->current_state = APP_STATE_HOME;
+                state->requested_screen = APP_SCREEN_HOME;
+            } else if (event->type == APP_EVENT_OPEN_WIFI_SETTINGS) {
+                state->current_state = APP_STATE_WIFI_SETTINGS;
+                state->requested_screen = APP_SCREEN_WIFI_SETTINGS;
+            }
+            break;
+
+        case APP_STATE_WIFI_SETTINGS:
+            if (event->type == APP_EVENT_BACK) {
+                state->current_state = APP_STATE_SETTINGS;
+                state->requested_screen = APP_SCREEN_SETTINGS;
+            } else if (event->type == APP_EVENT_OPEN_HOME) {
                 state->current_state = APP_STATE_HOME;
                 state->requested_screen = APP_SCREEN_HOME;
             }

@@ -94,6 +94,42 @@ static void return_async_cb(void *user_data)
     app_coordinator_post_event(&evt);
 }
 
+static void nav_home_async_cb(void *user_data)
+{
+    data_viewer_presenter_t *p = (data_viewer_presenter_t *)user_data;
+    if (!p) return;
+
+    presenter_free_loaded_data(p);
+
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_HOME;
+    app_coordinator_post_event(&evt);
+}
+
+static void nav_eit_async_cb(void *user_data)
+{
+    data_viewer_presenter_t *p = (data_viewer_presenter_t *)user_data;
+    if (!p) return;
+
+    presenter_free_loaded_data(p);
+
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_BROWSER;
+    app_coordinator_post_event(&evt);
+}
+
+static void nav_settings_async_cb(void *user_data)
+{
+    data_viewer_presenter_t *p = (data_viewer_presenter_t *)user_data;
+    if (!p) return;
+
+    presenter_free_loaded_data(p);
+
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_SETTINGS;
+    app_coordinator_post_event(&evt);
+}
+
 void data_viewer_presenter_init(data_viewer_presenter_t *presenter, data_viewer_view_t *view)
 {
     if (!presenter) return;
@@ -163,6 +199,30 @@ void data_viewer_presenter_on_tab_changed(void *ctx, uint32_t tab_id)
         default:
             break;
     }
+}
+
+void data_viewer_presenter_on_nav_home(void *ctx)
+{
+    data_viewer_presenter_t *p = (data_viewer_presenter_t *)ctx;
+    if (!p) return;
+
+    lv_async_call(nav_home_async_cb, p);
+}
+
+void data_viewer_presenter_on_nav_eit(void *ctx)
+{
+    data_viewer_presenter_t *p = (data_viewer_presenter_t *)ctx;
+    if (!p) return;
+
+    lv_async_call(nav_eit_async_cb, p);
+}
+
+void data_viewer_presenter_on_nav_settings(void *ctx)
+{
+    data_viewer_presenter_t *p = (data_viewer_presenter_t *)ctx;
+    if (!p) return;
+
+    lv_async_call(nav_settings_async_cb, p);
 }
 
 float **data_viewer_presenter_get_uel(data_viewer_presenter_t *presenter, uint16_t *out_n_meas, uint16_t *out_n_inj)

@@ -19,6 +19,9 @@ void data_viewer_create(const char *filename)
     bindings.on_return = data_viewer_presenter_on_return;
     bindings.on_run = data_viewer_presenter_on_run;
     bindings.on_tab_changed = data_viewer_presenter_on_tab_changed;
+    bindings.on_nav_home = data_viewer_presenter_on_nav_home;
+    bindings.on_nav_eit = data_viewer_presenter_on_nav_eit;
+    bindings.on_nav_settings = data_viewer_presenter_on_nav_settings;
 
     data_viewer_view_create(&s_view, lv_screen_active(), &bindings);
     data_viewer_presenter_on_create(&s_presenter, filename);

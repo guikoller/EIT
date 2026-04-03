@@ -2,6 +2,7 @@
 #define SD_FILE_BROWSER_VIEW_H
 
 #include "lvgl/lvgl.h"
+#include "screens/common/left_menu.h"
 
 #include <stdint.h>
 #include <stddef.h>
@@ -19,16 +20,24 @@ typedef struct {
 } sd_browser_file_entry_t;
 
 typedef void (*sd_browser_on_load_cb_t)(void *ctx, const char *filename);
+typedef void (*sd_browser_on_back_cb_t)(void *ctx);
 
 typedef struct {
     void *ctx;
+    sd_browser_on_back_cb_t on_back;
+    sd_browser_on_back_cb_t on_nav_home;
+    sd_browser_on_back_cb_t on_nav_eit;
+    sd_browser_on_back_cb_t on_nav_settings;
     sd_browser_on_load_cb_t on_load;
 } sd_file_browser_view_bindings_t;
 
 typedef struct {
     lv_obj_t *cont;
+    lv_obj_t *content;
+    left_menu_t menu;
     lv_obj_t *file_list;
     lv_obj_t *btn_load;
+    lv_obj_t *btn_back;
     lv_obj_t *label_title;
     lv_obj_t *label_status;
 

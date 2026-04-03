@@ -94,12 +94,20 @@ add_executable(${PROJECT_NAME}
     src/services/eit_acquisition.c
     src/services/eit_acq_simulated.c
     src/services/batch_process.c
+    src/services/json_encoder.c
+    src/services/wifi/esp8266_uart.c
+    src/services/wifi/esp8266_at.c
+    src/services/wifi/wifi_service.c
+    src/screens/common/left_menu.c
     src/screens/home/home_screen.c
     src/screens/home/home_view.c
     src/screens/home/home_presenter.c
     src/screens/settings/settings_screen.c
     src/screens/settings/settings_view.c
     src/screens/settings/settings_presenter.c
+    src/screens/wifi_settings/wifi_settings_screen.c
+    src/screens/wifi_settings/wifi_settings_view.c
+    src/screens/wifi_settings/wifi_settings_presenter.c
     src/screens/browser/sd_file_browser.c
     src/screens/browser/sd_file_browser_view.c
     src/screens/browser/sd_file_browser_presenter.c

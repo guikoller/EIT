@@ -248,3 +248,35 @@ void settings_presenter_on_batch(void *ctx)
     p->batch_start_pending = 1u;
     lv_async_call(batch_start_async_cb, p);
 }
+
+void settings_presenter_on_wifi(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_WIFI_SETTINGS;
+    app_coordinator_post_event(&evt);
+}
+
+void settings_presenter_on_nav_home(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_HOME;
+    app_coordinator_post_event(&evt);
+}
+
+void settings_presenter_on_nav_eit(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_BROWSER;
+    app_coordinator_post_event(&evt);
+}
+
+void settings_presenter_on_nav_settings(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_SETTINGS;
+    app_coordinator_post_event(&evt);
+}

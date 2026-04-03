@@ -18,7 +18,6 @@ void sd_file_browser_presenter_on_create(sd_file_browser_presenter_t *presenter)
 {
     if (!presenter || !presenter->view) return;
 
-    sd_file_browser_view_set_status(presenter->view, "READY");
     sd_file_browser_view_set_enabled(presenter->view, 1);
 
     storage_file_entry_t tmp[EIT_MAX_BROWSER_FILES];
@@ -40,6 +39,38 @@ void sd_file_browser_presenter_on_create(sd_file_browser_presenter_t *presenter)
     }
 
     sd_file_browser_view_set_files(presenter->view, entries, count);
+}
+
+void sd_file_browser_presenter_on_back(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_BACK;
+    app_coordinator_post_event(&evt);
+}
+
+void sd_file_browser_presenter_on_nav_home(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_HOME;
+    app_coordinator_post_event(&evt);
+}
+
+void sd_file_browser_presenter_on_nav_eit(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_BROWSER;
+    app_coordinator_post_event(&evt);
+}
+
+void sd_file_browser_presenter_on_nav_settings(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_SETTINGS;
+    app_coordinator_post_event(&evt);
 }
 
 void sd_file_browser_presenter_on_load(void *ctx, const char *filename)
