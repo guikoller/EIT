@@ -66,6 +66,11 @@ void app_fsm_dispatch(app_state_t *state, const app_event_t *event)
             state->requested_screen = APP_SCREEN_RECON_VIEWER;
             return;
 
+        case APP_EVENT_OPEN_SERIAL_MONITOR:
+            state->current_state = APP_STATE_SERIAL_MONITOR;
+            state->requested_screen = APP_SCREEN_SERIAL_MONITOR;
+            return;
+
         default:
             break;
     }
@@ -94,6 +99,16 @@ void app_fsm_dispatch(app_state_t *state, const app_event_t *event)
             break;
 
         case APP_STATE_WIFI_SETTINGS:
+            if (event->type == APP_EVENT_BACK) {
+                state->current_state = APP_STATE_SETTINGS;
+                state->requested_screen = APP_SCREEN_SETTINGS;
+            } else if (event->type == APP_EVENT_OPEN_HOME) {
+                state->current_state = APP_STATE_HOME;
+                state->requested_screen = APP_SCREEN_HOME;
+            }
+            break;
+
+        case APP_STATE_SERIAL_MONITOR:
             if (event->type == APP_EVENT_BACK) {
                 state->current_state = APP_STATE_SETTINGS;
                 state->requested_screen = APP_SCREEN_SETTINGS;

@@ -257,6 +257,14 @@ void settings_presenter_on_wifi(void *ctx)
     app_coordinator_post_event(&evt);
 }
 
+void settings_presenter_on_serial_monitor(void *ctx)
+{
+    (void)ctx;
+    app_event_t evt;
+    evt.type = APP_EVENT_OPEN_SERIAL_MONITOR;
+    app_coordinator_post_event(&evt);
+}
+
 void settings_presenter_on_nav_home(void *ctx)
 {
     (void)ctx;

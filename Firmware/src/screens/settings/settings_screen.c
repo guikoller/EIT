@@ -26,6 +26,7 @@ void settings_screen_create(void)
     bindings.on_calibrate       = settings_presenter_on_calibrate;
     bindings.on_batch           = settings_presenter_on_batch;
     bindings.on_wifi            = settings_presenter_on_wifi;
+    bindings.on_serial_monitor   = settings_presenter_on_serial_monitor;
 
     settings_view_create(&s_view, lv_screen_active(), &bindings);
     settings_presenter_on_create(&s_presenter);

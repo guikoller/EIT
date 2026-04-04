@@ -18,6 +18,7 @@
 #include "stm32f769i_discovery.h"
 #include "stm32f769i_discovery_lcd.h"
 #include "lvgl/lvgl.h"
+#include "services/wifi/esp8266_uart.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -53,4 +54,9 @@ void SysTick_Handler(void)
   */
 void DSI_IRQHandler(void){
   HAL_DSI_IRQHandler(&hdsi_discovery);
+}
+
+void UART5_IRQHandler(void)
+{
+  esp8266_uart_irq_handler();
 }

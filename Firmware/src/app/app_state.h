@@ -14,6 +14,7 @@ typedef enum {
     APP_STATE_BROWSER,
     APP_STATE_DATA_VIEWER,
     APP_STATE_RECON_VIEWER,
+    APP_STATE_SERIAL_MONITOR,
     APP_STATE_ERROR,
 } app_state_id_t;
 
@@ -25,6 +26,7 @@ typedef enum {
     APP_SCREEN_BROWSER,
     APP_SCREEN_DATA_VIEWER,
     APP_SCREEN_RECON_VIEWER,
+    APP_SCREEN_SERIAL_MONITOR,
 } app_screen_t;
 
 /** Runtime settings — edited on the Settings screen, read elsewhere. */

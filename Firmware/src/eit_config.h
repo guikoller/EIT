@@ -78,6 +78,11 @@ static inline uint32_t eit_display_size_for_setting(uint16_t image_size)
  *  Sized for EIT_DISPLAY_SIZE_MAX² × 2 = 295 KB.                     */
 #define EIT_SDRAM_CANVAS_BUF_ADDR   ((uint32_t)0xC0B00000u)
 
+/** JSON encoder buffer for recording measurement data.
+ *  64 KB is enough for ~1264 floats in JSON format.                  */
+#define EIT_SDRAM_JSON_BUF_ADDR     ((uint32_t)0xC0C00000u)
+#define EIT_SDRAM_JSON_BUF_SIZE     (64u * 1024u)
+
 /* ------------------------------------------------------------------ */
 /*  Algorithm selection                                                */
 /* ------------------------------------------------------------------ */
@@ -101,10 +106,10 @@ typedef enum {
 /** Y-axis pixel offset applied to every touch coordinate.
  *  Increase if you must tap above a button; decrease (or negate)
  *  if you must tap below. */
-#define EIT_TOUCH_Y_OFFSET      20
+#define EIT_TOUCH_Y_OFFSET      0
 
 /** X-axis pixel offset (usually 0). */
-#define EIT_TOUCH_X_OFFSET      0
+#define EIT_TOUCH_X_OFFSET      -10
 
 /* ------------------------------------------------------------------ */
 /*  File browser                                                       */

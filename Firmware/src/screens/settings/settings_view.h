@@ -26,6 +26,7 @@ typedef struct {
     settings_cb_t       on_calibrate;
     settings_cb_t       on_batch;
     settings_cb_t       on_wifi;
+    settings_cb_t       on_serial_monitor;
 } settings_view_bindings_t;
 
 typedef struct {
@@ -53,6 +54,9 @@ typedef struct {
 
     /* WiFi settings button */
     lv_obj_t *btn_wifi;
+
+    /* Serial monitor button */
+    lv_obj_t *btn_serial_monitor;
 
     /* Back button */
     lv_obj_t *btn_back;

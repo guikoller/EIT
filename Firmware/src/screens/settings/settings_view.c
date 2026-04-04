@@ -108,6 +108,13 @@ static void wifi_clicked(lv_event_t *e)
         v->bindings.on_wifi(v->bindings.ctx);
 }
 
+static void serial_monitor_clicked(lv_event_t *e)
+{
+    settings_view_t *v = (settings_view_t *)lv_event_get_user_data(e);
+    if (v && v->bindings.on_serial_monitor)
+        v->bindings.on_serial_monitor(v->bindings.ctx);
+}
+
 /* ---- Helper: section label ---- */
 static lv_obj_t *make_section_label(lv_obj_t *parent, const char *text,
                                     lv_align_t align, int x, int y)
@@ -162,7 +169,7 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
 
     /* ---- Card area ---- */
     lv_obj_t *card = lv_obj_create(view->content);
-    lv_obj_set_size(card, left_menu_content_width() - 34, 390);
+    lv_obj_set_size(card, left_menu_content_width() - 34, 454);
     lv_obj_align(card, LV_ALIGN_TOP_MID, 0, 54);
     lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
     lv_obj_set_style_border_color(card, lv_color_hex(COL_CARD_BORDER), 0);
@@ -322,19 +329,45 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     lv_obj_set_style_text_font(wifi_lbl, &lv_font_montserrat_14, 0);
     lv_obj_center(wifi_lbl);
 
+    /* ---- Row 7: Serial Monitor ---- */
+    lv_obj_t *row7 = lv_obj_create(card);
+    lv_obj_set_size(row7, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_min_height(row7, 50, 0);
+    lv_obj_set_style_bg_opa(row7, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row7, 0, 0);
+    lv_obj_set_style_pad_all(row7, 0, 0);
+
+    make_section_label(row7, "Serial Monitor", LV_ALIGN_LEFT_MID, 0, 0);
+
+    view->btn_serial_monitor = lv_button_create(row7);
+    lv_obj_set_size(view->btn_serial_monitor, 270, 50);
+    lv_obj_align(view->btn_serial_monitor, LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_set_style_bg_color(view->btn_serial_monitor, lv_color_hex(COL_BTN), 0);
+    lv_obj_set_style_radius(view->btn_serial_monitor, 8, 0);
+    lv_obj_set_style_shadow_width(view->btn_serial_monitor, 0, 0);
+    lv_obj_set_style_shadow_color(view->btn_serial_monitor, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(view->btn_serial_monitor, 0, 0);
+    lv_obj_add_event_cb(view->btn_serial_monitor, serial_monitor_clicked, LV_EVENT_CLICKED, view);
+
+    lv_obj_t *serial_lbl = lv_label_create(view->btn_serial_monitor);
+    lv_label_set_text(serial_lbl, LV_SYMBOL_USB "  SERIAL MONITOR");
+    lv_obj_set_style_text_color(serial_lbl, lv_color_white(), 0);
+    lv_obj_set_style_text_font(serial_lbl, &lv_font_montserrat_14, 0);
+    lv_obj_center(serial_lbl);
+
     /* Calibration status label */
     view->label_calib_status = lv_label_create(view->content);
     lv_label_set_text(view->label_calib_status, "");
     lv_obj_set_style_text_color(view->label_calib_status, lv_color_hex(COL_ACCENT), 0);
     lv_obj_set_style_text_font(view->label_calib_status, &lv_font_montserrat_14, 0);
-    lv_obj_align(view->label_calib_status, LV_ALIGN_TOP_MID, 0, 452);
+    lv_obj_align(view->label_calib_status, LV_ALIGN_TOP_MID, 0, 516);
 
     /* Batch status label */
     view->label_batch_status = lv_label_create(view->content);
     lv_label_set_text(view->label_batch_status, "");
     lv_obj_set_style_text_color(view->label_batch_status, lv_color_hex(COL_ACCENT), 0);
     lv_obj_set_style_text_font(view->label_batch_status, &lv_font_montserrat_14, 0);
-    lv_obj_align(view->label_batch_status, LV_ALIGN_TOP_MID, 0, 430);
+    lv_obj_align(view->label_batch_status, LV_ALIGN_TOP_MID, 0, 494);
     view->btn_back = NULL;
 }
 
