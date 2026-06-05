@@ -14,6 +14,9 @@
 #define DISPLAY_SIZE  EIT_DISPLAY_SIZE
 #define DISPLAY_SIZE_MAX  EIT_DISPLAY_SIZE_MAX
 
+/* Forward declaration for async streaming callback used inside acq_timer_cb */
+static void stream_send_async_cb(void *user_data);
+
 static void presenter_cleanup(reconstruction_viewer_presenter_t *p)
 {
     if (!p) return;
@@ -30,6 +33,11 @@ static void presenter_cleanup(reconstruction_viewer_presenter_t *p)
 
     /* recon_result points to static LBP buffer — just clear the pointer */
     p->recon_result = NULL;
+
+    /* Stop streaming */
+    p->streaming      = 0;
+    p->upload_pending = 0;
+    p->stream_is_first = 1;
 
     /* Destroy acquisition backend (frees all loaded data) */
     if (p->acq_backend) {
@@ -459,6 +467,26 @@ static ReconstructionResult *dispatch_reconstruct(
     return lbp_reconstruct(ref_uel, target_uel, n_meas, n_inj);
 }
 
+/* ---------- Live-stream send callback (runs in lv_async) ---------- */
+static void stream_send_async_cb(void *user_data)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)user_data;
+    if (!p) return;
+
+    if (p->stream_json_len > 0u) {
+        const char *json_buf = (const char *)EIT_SDRAM_JSON_BUF_ADDR;
+        char reply[64];
+
+        if (wifi_service_init() == 0) {
+            wifi_service_post_buffer("/api/frame",
+                                     json_buf, p->stream_json_len,
+                                     reply, sizeof(reply));
+        }
+    }
+
+    p->upload_pending = 0;
+}
+
 /* ---------- Continuous acquisition timer ---------- */
 static void acq_timer_cb(lv_timer_t *t)
 {
@@ -496,6 +524,47 @@ static void acq_timer_cb(lv_timer_t *t)
             reconstruction_viewer_view_set_fps(p->view, fps_x10);
             p->frame_count = 0;
             p->fps_tick_start = now;
+        }
+
+        /* Live streaming — encode compact frame JSON into SDRAM scratch,
+         * then fire an async TCP send.  We drop this frame if a previous
+         * send is still in flight (upload_pending) to prevent queuing. */
+        if (p->streaming && !p->upload_pending) {
+            char *json_buf = (char *)EIT_SDRAM_JSON_BUF_ADDR;
+            json_encoder_t enc;
+            json_init(&enc, json_buf, EIT_SDRAM_JSON_BUF_SIZE);
+
+            json_object_start(&enc);
+            json_key_uint(&enc, "f", frame.frame_number);
+            json_key_uint(&enc, "t", frame.timestamp_ms);
+            json_key_int(&enc, "ref", p->stream_is_first ? 1 : 0);
+            json_key_uint(&enc, "nm", (uint32_t)frame.n_meas);
+            json_key_uint(&enc, "ni", (uint32_t)frame.n_inj);
+
+            uint32_t uel_count = (uint32_t)frame.n_meas * frame.n_inj;
+            json_key_array(&enc, "uel");
+            for (uint32_t i = 0; i < uel_count; i++) {
+                json_float(&enc, frame.uel[i]);
+            }
+            json_array_end(&enc);
+
+            if (p->recon_result && p->recon_result->success && p->recon_result->image_data) {
+                uint32_t n_px = (uint32_t)p->recon_result->image_size *
+                                (uint32_t)p->recon_result->image_size;
+                json_key_array(&enc, "px");
+                for (uint32_t i = 0; i < n_px; i++) {
+                    json_float(&enc, p->recon_result->image_data[i]);
+                }
+                json_array_end(&enc);
+            }
+            json_object_end(&enc);
+
+            if (!json_has_error(&enc)) {
+                p->stream_json_len = (uint32_t)json_get_length(&enc);
+                p->stream_is_first = 0;
+                p->upload_pending  = 1;
+                lv_async_call(stream_send_async_cb, p);
+            }
         }
 
         /* Start next acquisition cycle */
@@ -916,4 +985,21 @@ void reconstruction_viewer_presenter_on_nav_settings(void *ctx)
     if (!p) return;
 
     lv_async_call(recon_nav_settings_async_cb, p);
+}
+
+void reconstruction_viewer_presenter_on_stream(void *ctx)
+{
+    reconstruction_viewer_presenter_t *p = (reconstruction_viewer_presenter_t *)ctx;
+    if (!p || !p->view) return;
+
+    p->streaming = !p->streaming;
+    if (p->streaming) {
+        p->stream_is_first = 1;
+        p->upload_pending  = 0;
+        reconstruction_viewer_view_set_stream_state(p->view, 1);
+        reconstruction_viewer_view_set_status(p->view, "Streaming...");
+    } else {
+        reconstruction_viewer_view_set_stream_state(p->view, 0);
+        reconstruction_viewer_view_set_status(p->view, "Stream stopped");
+    }
 }

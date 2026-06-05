@@ -27,6 +27,7 @@ typedef struct {
     settings_cb_t       on_batch;
     settings_cb_t       on_wifi;
     settings_cb_t       on_serial_monitor;
+    settings_cb_t       on_send_exam;
 } settings_view_bindings_t;
 
 typedef struct {
@@ -58,6 +59,9 @@ typedef struct {
     /* Serial monitor button */
     lv_obj_t *btn_serial_monitor;
 
+    /* Send exam button */
+    lv_obj_t *btn_send_exam;
+
     /* Back button */
     lv_obj_t *btn_back;
 
@@ -84,6 +88,9 @@ void settings_view_set_batch_status(settings_view_t *view, const char *text);
 
 /** Enable / disable the batch-process button. */
 void settings_view_set_batch_enabled(settings_view_t *view, int enabled);
+
+/** Enable / disable the send-exam button. */
+void settings_view_set_send_exam_enabled(settings_view_t *view, int enabled);
 
 #ifdef __cplusplus
 }

@@ -124,6 +124,18 @@ static void send_btn_clicked(lv_event_t *e)
     }
 }
 
+static void stream_btn_clicked(lv_event_t *e)
+{
+    reconstruction_viewer_view_t *view = (reconstruction_viewer_view_t *)lv_event_get_user_data(e);
+    if (!view) return;
+
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+
+    if (view->bindings.on_stream) {
+        view->bindings.on_stream(view->bindings.ctx);
+    }
+}
+
 static void play_pause_btn_clicked(lv_event_t *e)
 {
     reconstruction_viewer_view_t *view = (reconstruction_viewer_view_t *)lv_event_get_user_data(e);
@@ -367,6 +379,23 @@ void reconstruction_viewer_view_create(reconstruction_viewer_view_t *view, lv_ob
     lv_obj_set_style_text_color(label_record, lv_color_white(), 0);
     lv_obj_center(label_record);
 
+    /* STREAM toggle button — next to RECORD */
+    view->btn_stream = lv_button_create(view->content);
+    lv_obj_set_size(view->btn_stream, 110, 52);
+    lv_obj_align(view->btn_stream, LV_ALIGN_BOTTOM_LEFT, 130, -10);
+    lv_obj_set_style_bg_color(view->btn_stream, lv_color_hex(COL_BTN_SEC), 0);
+    lv_obj_set_style_radius(view->btn_stream, 8, 0);
+    lv_obj_set_style_shadow_width(view->btn_stream, 4, 0);
+    lv_obj_set_style_shadow_color(view->btn_stream, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(view->btn_stream, 2, 0);
+    lv_obj_add_event_cb(view->btn_stream, stream_btn_clicked, LV_EVENT_CLICKED, view);
+
+    view->label_stream_text = lv_label_create(view->btn_stream);
+    lv_label_set_text(view->label_stream_text, LV_SYMBOL_WIFI " STREAM");
+    lv_obj_set_style_text_color(view->label_stream_text, lv_color_white(), 0);
+    lv_obj_set_style_text_font(view->label_stream_text, &lv_font_montserrat_14, 0);
+    lv_obj_center(view->label_stream_text);
+
     view->btn_save = lv_button_create(view->content);
     lv_obj_set_size(view->btn_save, 110, 52);
     lv_obj_align(view->btn_save, LV_ALIGN_BOTTOM_RIGHT, -128, -10);
@@ -550,4 +579,17 @@ void reconstruction_viewer_view_set_display_size(reconstruction_viewer_view_t *v
 
     /* Force overlay recomputation */
     s_overlay_ready = 0;
+}
+
+void reconstruction_viewer_view_set_stream_state(reconstruction_viewer_view_t *view, int active)
+{
+    if (!view || !view->btn_stream || !view->label_stream_text) return;
+
+    if (active) {
+        lv_obj_set_style_bg_color(view->btn_stream, lv_color_hex(COL_BTN_PLAY), 0);
+        lv_label_set_text(view->label_stream_text, LV_SYMBOL_WIFI " LIVE");
+    } else {
+        lv_obj_set_style_bg_color(view->btn_stream, lv_color_hex(COL_BTN_SEC), 0);
+        lv_label_set_text(view->label_stream_text, LV_SYMBOL_WIFI " STREAM");
+    }
 }

@@ -4,7 +4,9 @@
 #include "services/calibration.h"
 #include "services/storage_service.h"
 #include "services/batch_process.h"
+#include "services/wifi/wifi_service.h"
 
+#include "ff.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -263,6 +265,90 @@ void settings_presenter_on_serial_monitor(void *ctx)
     app_event_t evt;
     evt.type = APP_EVENT_OPEN_SERIAL_MONITOR;
     app_coordinator_post_event(&evt);
+}
+
+static void send_exam_async_cb(void *user_data)
+{
+    settings_presenter_t *p = (settings_presenter_t *)user_data;
+    if (!p || !p->view) return;
+
+    p->send_exam_pending = 0u;
+
+    /* Scan SD card root for lexicographically latest .json file */
+    DIR dir;
+    FILINFO fno;
+    char json_path[64];
+    json_path[0] = '\0';
+
+    FRESULT res = f_opendir(&dir, "0:/");
+    if (res != FR_OK) {
+        settings_view_set_batch_status(p->view, "SEND ERR: no SD");
+        settings_view_set_send_exam_enabled(p->view, 1);
+        return;
+    }
+
+    for (;;) {
+        res = f_readdir(&dir, &fno);
+        if (res != FR_OK || fno.fname[0] == '\0') break;
+        if (fno.fattrib & AM_DIR) continue;
+
+        const char *dot = strrchr(fno.fname, '.');
+        if (!dot) continue;
+        const char *ext = dot + 1;
+        if (ext[0] != 'j' && ext[0] != 'J') continue;  /* quick filter */
+        if (strcmp(ext, "json") != 0 && strcmp(ext, "JSON") != 0) continue;
+
+        char candidate[64];
+        snprintf(candidate, sizeof(candidate), "0:/%s", fno.fname);
+        if (json_path[0] == '\0' || strcmp(candidate, json_path) > 0) {
+            strncpy(json_path, candidate, sizeof(json_path) - 1);
+            json_path[sizeof(json_path) - 1] = '\0';
+        }
+    }
+    f_closedir(&dir);
+
+    if (json_path[0] == '\0') {
+        settings_view_set_batch_status(p->view, "SEND ERR: no .json");
+        settings_view_set_send_exam_enabled(p->view, 1);
+        return;
+    }
+
+    if (wifi_service_init() != 0) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "SEND ERR: %s", wifi_service_last_error());
+        settings_view_set_batch_status(p->view, msg);
+        settings_view_set_send_exam_enabled(p->view, 1);
+        return;
+    }
+
+    char reply[64];
+    if (wifi_service_send_json_file(json_path, reply, sizeof(reply)) != 0) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "SEND ERR: %s", wifi_service_last_error());
+        settings_view_set_batch_status(p->view, msg);
+        settings_view_set_send_exam_enabled(p->view, 1);
+        return;
+    }
+
+    const char *fn = json_path;
+    if (strncmp(fn, "0:/", 3) == 0) fn += 3;
+    char msg[96];
+    snprintf(msg, sizeof(msg), "Sent: %s", fn);
+    settings_view_set_batch_status(p->view, msg);
+    settings_view_set_send_exam_enabled(p->view, 1);
+}
+
+void settings_presenter_on_send_exam(void *ctx)
+{
+    settings_presenter_t *p = (settings_presenter_t *)ctx;
+    if (!p || !p->view) return;
+
+    if (p->send_exam_pending) return;
+
+    p->send_exam_pending = 1u;
+    settings_view_set_batch_status(p->view, "Sending exam...");
+    settings_view_set_send_exam_enabled(p->view, 0);
+    lv_async_call(send_exam_async_cb, p);
 }
 
 void settings_presenter_on_nav_home(void *ctx)

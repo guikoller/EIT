@@ -23,6 +23,7 @@ void reconstruction_viewer_create(const char *filename)
     bindings.on_play_pause = reconstruction_viewer_presenter_on_play_pause;
     bindings.on_noise_toggle = reconstruction_viewer_presenter_on_noise_toggle;
     bindings.on_noise_level = reconstruction_viewer_presenter_on_noise_level;
+    bindings.on_stream = reconstruction_viewer_presenter_on_stream;
     bindings.on_nav_home = reconstruction_viewer_presenter_on_nav_home;
     bindings.on_nav_eit = reconstruction_viewer_presenter_on_nav_eit;
     bindings.on_nav_settings = reconstruction_viewer_presenter_on_nav_settings;

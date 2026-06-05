@@ -80,6 +80,7 @@ add_definitions(
     -DSTM32F769I_DISCO
     -DDEBUG
     -DUSE_HAL_DRIVER
+    -DESP8266_USE_EN_PIN=1
 )
 
 # list of modules to build final firmware (without extension .c or .cpp)
@@ -108,6 +109,9 @@ add_executable(${PROJECT_NAME}
     src/screens/wifi_settings/wifi_settings_screen.c
     src/screens/wifi_settings/wifi_settings_view.c
     src/screens/wifi_settings/wifi_settings_presenter.c
+    src/screens/serial_monitor/serial_monitor_screen.c
+    src/screens/serial_monitor/serial_monitor_view.c
+    src/screens/serial_monitor/serial_monitor_presenter.c
     src/screens/browser/sd_file_browser.c
     src/screens/browser/sd_file_browser_view.c
     src/screens/browser/sd_file_browser_presenter.c

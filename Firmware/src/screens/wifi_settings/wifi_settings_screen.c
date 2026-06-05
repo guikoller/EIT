@@ -22,6 +22,7 @@ void wifi_settings_screen_create(void)
     bindings.on_nav_settings = wifi_settings_presenter_on_nav_settings;
     bindings.on_save = wifi_settings_presenter_on_save;
     bindings.on_connect = wifi_settings_presenter_on_connect;
+    bindings.on_scan = wifi_settings_presenter_on_scan;
 
     wifi_settings_view_create(&s_view, lv_screen_active(), &bindings);
     wifi_settings_presenter_on_create(&s_presenter);

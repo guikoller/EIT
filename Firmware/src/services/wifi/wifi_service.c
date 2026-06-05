@@ -487,7 +487,6 @@ void wifi_service_set_config(const wifi_service_config_t *cfg)
 
     safe_copy(s_cfg.ssid, WIFI_SSID_MAX, cfg->ssid);
     safe_copy(s_cfg.password, WIFI_PASSWORD_MAX, cfg->password);
-    safe_copy(s_cfg.server, WIFI_SERVER_MAX, cfg->server);
 }
 
 int wifi_service_load_config(void)
@@ -511,7 +510,6 @@ int wifi_service_load_config(void)
 
     (void)extract_json_string(json, "ssid", s_cfg.ssid, WIFI_SSID_MAX);
     (void)extract_json_string(json, "password", s_cfg.password, WIFI_PASSWORD_MAX);
-    (void)extract_json_string(json, "server", s_cfg.server, WIFI_SERVER_MAX);
 
     return 0;
 }
@@ -525,7 +523,6 @@ int wifi_service_save_config(void)
     json_object_start(&enc);
     json_key_string(&enc, "ssid", s_cfg.ssid);
     json_key_string(&enc, "password", s_cfg.password);
-    json_key_string(&enc, "server", s_cfg.server);
     json_object_end(&enc);
 
     if (json_has_error(&enc)) {
@@ -632,17 +629,131 @@ int wifi_service_connect(void)
     return 0;
 }
 
+int wifi_service_scan(wifi_scan_entry_t *results, uint32_t max_results)
+{
+    if (!results || max_results == 0u) {
+        return 0;
+    }
+
+    if (!s_inited && wifi_service_init() != 0) {
+        return -1;
+    }
+
+    /* Ensure station mode — do not call resync (avoids hard reset) */
+    char resp[128];
+    if (wifi_run_command("AT+CWMODE=1", "OK", 3000u, resp, sizeof(resp),
+                         "CWMODE=1 failed before scan") != 0) {
+        return -1;
+    }
+
+    /* AT+CWLAP collects all lines until OK.
+       at_wait_impl accumulates the full response (all +CWLAP: lines)
+       in scan_buf, then returns 0 when it sees OK. */
+    static char scan_buf[2048];
+    int rc = esp8266_at_command("AT+CWLAP", "OK", 15000u,
+                                scan_buf, sizeof(scan_buf));
+    if (rc != 0) {
+        set_error("AT+CWLAP failed (rc=%d)", rc);
+        return -1;
+    }
+
+    /* Parse all +CWLAP: entries.
+       Format: +CWLAP:(ecn,"ssid",rssi,"mac",channel,...) */
+    uint32_t count = 0u;
+    const char *pos = scan_buf;
+
+    while (count < max_results) {
+        const char *entry = strstr(pos, "+CWLAP:");
+        if (!entry) {
+            break;
+        }
+
+        pos = entry + 7u; /* advance past "+CWLAP:" for next iteration */
+
+        const char *q1 = strchr(entry, '"');
+        if (!q1) {
+            continue;
+        }
+        q1++;
+        const char *q2 = strchr(q1, '"');
+        if (!q2) {
+            continue;
+        }
+
+        uint32_t slen = (uint32_t)(q2 - q1);
+        if (slen == 0u) {
+            continue; /* hidden/empty SSID — skip */
+        }
+        if (slen >= WIFI_SSID_MAX) {
+            slen = WIFI_SSID_MAX - 1u;
+        }
+
+        memcpy(results[count].ssid, q1, slen);
+        results[count].ssid[slen] = '\0';
+
+        /* RSSI is the number after the comma following the closing SSID quote */
+        results[count].rssi = 0;
+        const char *comma = strchr(q2, ',');
+        if (comma) {
+            results[count].rssi = (int)strtol(comma + 1, NULL, 10);
+        }
+
+        count++;
+    }
+
+    esp8266_uart_debug_write_str("[WiFi] scan done: ");
+    char nbuf[8];
+    (void)snprintf(nbuf, sizeof(nbuf), "%lu\r\n", (unsigned long)count);
+    esp8266_uart_debug_write_str(nbuf);
+
+    return (int)count;
+}
+
+/* ESP8266 AT+CIPSEND hard limit per call */
+#define ESP8266_CIPSEND_CHUNK 2048u
+
+/**
+ * Send a buffer over the open TCP connection in <=2048-byte CIPSEND chunks.
+ * Returns 0 on success, -1 on error (error string already set).
+ */
+static int send_chunked(const uint8_t *data, uint32_t len,
+                        char *resp, uint32_t resp_size)
+{
+    uint32_t offset = 0u;
+    while (offset < len) {
+        uint32_t chunk = len - offset;
+        if (chunk > ESP8266_CIPSEND_CHUNK)
+            chunk = ESP8266_CIPSEND_CHUNK;
+
+        char cmd[32];
+        snprintf(cmd, sizeof(cmd), "AT+CIPSEND=%lu", (unsigned long)chunk);
+
+        if (wifi_run_command(cmd, ">", 4000u, resp, resp_size,
+                             "CIPSEND chunk failed") != 0) {
+            return -1;
+        }
+
+        if (esp8266_at_write_raw(data + offset, (uint16_t)chunk, 5000u) != 0) {
+            set_error("Failed writing chunk at offset %lu", (unsigned long)offset);
+            return -1;
+        }
+
+        if (esp8266_at_wait("SEND OK", 8000u, resp, resp_size) != 0) {
+            set_error_with_response("No SEND OK for chunk", resp);
+            return -1;
+        }
+
+        offset += chunk;
+    }
+    return 0;
+}
+
 int wifi_service_send_json_file(const char *json_path,
                                 char *server_reply,
                                 uint32_t server_reply_size)
 {
     if (!json_path || json_path[0] == '\0') {
         set_error("Invalid JSON file");
-        return -1;
-    }
-
-    if (s_cfg.server[0] == '\0') {
-        set_error("Server is not configured");
         return -1;
     }
 
@@ -655,7 +766,7 @@ int wifi_service_send_json_file(const char *json_path,
     char host[96];
     char path[96];
     uint16_t port = 80u;
-    if (!parse_server_url(s_cfg.server, host, sizeof(host), &port, path, sizeof(path))) {
+    if (!parse_server_url(EIT_SERVER_URL, host, sizeof(host), &port, path, sizeof(path))) {
         return -1;
     }
 
@@ -701,34 +812,89 @@ int wifi_service_send_json_file(const char *json_path,
         return -1;
     }
 
-    uint32_t total_len = (uint32_t)hdr_len + payload_len;
-    cmd_len = snprintf(cmd, sizeof(cmd), "AT+CIPSEND=%lu", (unsigned long)total_len);
+    if (send_chunked((const uint8_t *)request_hdr, (uint32_t)hdr_len,
+                     resp, sizeof(resp)) != 0) {
+        return -1;
+    }
+
+    if (send_chunked((const uint8_t *)payload, payload_len,
+                     resp, sizeof(resp)) != 0) {
+        return -1;
+    }
+
+    if (server_reply && server_reply_size > 0u) {
+        server_reply[0] = '\0';
+        (void)esp8266_at_wait("+IPD", 3000u, server_reply, server_reply_size);
+    }
+
+    (void)esp8266_at_command("AT+CIPCLOSE", "OK", 1000u, resp, sizeof(resp));
+
+    s_state = WIFI_STATE_CONNECTED;
+    clear_error();
+    return 0;
+}
+
+int wifi_service_post_buffer(const char *api_path,
+                              const void *body, uint32_t body_len,
+                              char *server_reply,
+                              uint32_t server_reply_size)
+{
+    if (!api_path || !body || body_len == 0u) {
+        set_error("Invalid arguments");
+        return -1;
+    }
+
+    if (s_state != WIFI_STATE_CONNECTED) {
+        if (wifi_service_connect() != 0) {
+            return -1;
+        }
+    }
+
+    /* Extract host:port from hardcoded server URL; api_path is used as the POST target */
+    char host[96];
+    char ignored_path[96];
+    uint16_t port = 80u;
+    if (!parse_server_url(EIT_SERVER_URL, host, sizeof(host), &port,
+                          ignored_path, sizeof(ignored_path))) {
+        return -1;
+    }
+
+    char request_hdr[256];
+    int hdr_len = snprintf(request_hdr, sizeof(request_hdr),
+                           "POST %s HTTP/1.1\r\n"
+                           "Host: %s\r\n"
+                           "Content-Type: application/json\r\n"
+                           "Connection: close\r\n"
+                           "Content-Length: %lu\r\n\r\n",
+                           api_path, host, (unsigned long)body_len);
+    if (hdr_len <= 0 || hdr_len >= (int)sizeof(request_hdr)) {
+        set_error("HTTP header exceeds limit");
+        return -1;
+    }
+
+    char resp[640];
+    (void)esp8266_at_command("AT+CIPCLOSE", "OK", 1000u, resp, sizeof(resp));
+
+    char cmd[196];
+    int cmd_len = snprintf(cmd, sizeof(cmd),
+                           "AT+CIPSTART=\"TCP\",\"%s\",%u", host, (unsigned)port);
     if (cmd_len <= 0 || cmd_len >= (int)sizeof(cmd)) {
-        set_error("CIPSEND command is too long");
+        set_error("CIPSTART command is too long");
         return -1;
     }
 
-    if (wifi_run_command(cmd,
-                         ">",
-                         4000u,
-                         resp,
-                         sizeof(resp),
-                         "CIPSEND command failed") != 0) {
+    if (wifi_run_command(cmd, "OK", 10000u, resp, sizeof(resp),
+                         "CIPSTART command failed") != 0) {
         return -1;
     }
 
-    if (esp8266_at_write_raw((const uint8_t *)request_hdr, (uint32_t)hdr_len, 3000u) != 0) {
-        set_error("Failed sending HTTP header");
+    if (send_chunked((const uint8_t *)request_hdr, (uint32_t)hdr_len,
+                     resp, sizeof(resp)) != 0) {
         return -1;
     }
 
-    if (esp8266_at_write_raw((const uint8_t *)payload, payload_len, 15000u) != 0) {
-        set_error("Failed sending JSON payload");
-        return -1;
-    }
-
-    if (esp8266_at_wait("SEND OK", 12000u, resp, sizeof(resp)) != 0) {
-        set_error_with_response("No SEND OK confirmation", resp);
+    if (send_chunked((const uint8_t *)body, body_len,
+                     resp, sizeof(resp)) != 0) {
         return -1;
     }
 

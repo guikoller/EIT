@@ -16,6 +16,8 @@ typedef struct {
 
     lv_timer_t *batch_timer;
     uint8_t     batch_start_pending;
+
+    uint8_t     send_exam_pending;
 } settings_presenter_t;
 
 void settings_presenter_init(settings_presenter_t *p, settings_view_t *v);
@@ -30,6 +32,7 @@ void settings_presenter_on_calibrate(void *ctx);
 void settings_presenter_on_batch(void *ctx);
 void settings_presenter_on_wifi(void *ctx);
 void settings_presenter_on_serial_monitor(void *ctx);
+void settings_presenter_on_send_exam(void *ctx);
 void settings_presenter_on_nav_home(void *ctx);
 void settings_presenter_on_nav_eit(void *ctx);
 void settings_presenter_on_nav_settings(void *ctx);

@@ -17,6 +17,7 @@ typedef void (*recon_view_on_send_cb_t)(void *ctx);
 typedef void (*recon_view_on_play_pause_cb_t)(void *ctx);
 typedef void (*recon_view_on_noise_toggle_cb_t)(void *ctx);
 typedef void (*recon_view_on_noise_level_cb_t)(void *ctx, int32_t level);
+typedef void (*recon_view_on_stream_cb_t)(void *ctx);
 
 typedef struct {
     void *ctx;
@@ -27,6 +28,7 @@ typedef struct {
     recon_view_on_play_pause_cb_t on_play_pause;
     recon_view_on_noise_toggle_cb_t on_noise_toggle;
     recon_view_on_noise_level_cb_t on_noise_level;
+    recon_view_on_stream_cb_t on_stream;
     recon_view_on_return_cb_t on_nav_home;
     recon_view_on_return_cb_t on_nav_eit;
     recon_view_on_return_cb_t on_nav_settings;
@@ -44,6 +46,8 @@ typedef struct {
     lv_obj_t *btn_save;
     lv_obj_t *btn_record;
     lv_obj_t *btn_send;
+    lv_obj_t *btn_stream;
+    lv_obj_t *label_stream_text;
     lv_obj_t *btn_play_pause;
     lv_obj_t *label_play_pause_text;
     lv_obj_t *btn_noise;
@@ -77,6 +81,9 @@ void reconstruction_viewer_view_set_noise_state(reconstruction_viewer_view_t *vi
 
 /* Update noise percentage label from slider value. */
 void reconstruction_viewer_view_set_noise_level(reconstruction_viewer_view_t *view, int32_t pct);
+
+/* Update stream button visual state (1 = streaming ON, 0 = OFF). */
+void reconstruction_viewer_view_set_stream_state(reconstruction_viewer_view_t *view, int active);
 
 /* Update algorithm name label. */
 void reconstruction_viewer_view_set_algorithm(reconstruction_viewer_view_t *view, const char *name);

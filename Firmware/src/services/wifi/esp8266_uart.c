@@ -166,10 +166,6 @@
 #define ESP8266_DEBUG_UART_ENABLE 1
 #endif
 
-#ifndef ESP8266_DEBUG_UART_HEX_RX
-#define ESP8266_DEBUG_UART_HEX_RX 1
-#endif
-
 #if ESP8266_DEBUG_UART_ENABLE
 #ifndef ESP8266_DEBUG_UART_INSTANCE
 #define ESP8266_DEBUG_UART_INSTANCE USART1
@@ -233,9 +229,6 @@ static uint8_t s_ctrl_ready = 0u;
 #if ESP8266_DEBUG_UART_ENABLE
 static UART_HandleTypeDef s_dbg_uart;
 static uint8_t s_dbg_ready = 0u;
-#if ESP8266_DEBUG_UART_HEX_RX
-static uint8_t s_dbg_rx_line_open = 0u;
-#endif
 #endif
 
 #if ESP8266_DEBUG_UART_ENABLE
@@ -293,20 +286,6 @@ static void esp8266_uart_debug_write_byte(uint8_t byte)
 
     (void)HAL_UART_Transmit(&s_dbg_uart, &byte, 1u, 5u);
 }
-
-#if ESP8266_DEBUG_UART_HEX_RX
-static void esp8266_uart_debug_write_hex(uint8_t byte)
-{
-    static const char hex[] = "0123456789ABCDEF";
-    char out[4];
-
-    out[0] = hex[(byte >> 4) & 0x0F];
-    out[1] = hex[byte & 0x0F];
-    out[2] = ' ';
-    out[3] = '\0';
-    esp8266_uart_debug_write_str(out);
-}
-#endif
 #endif
 
 static int esp8266_uart_get_irqn(IRQn_Type *out_irq)
@@ -780,20 +759,6 @@ int esp8266_uart_read_byte(uint8_t *out, uint32_t timeout_ms)
         esp8266_uart_rearm_rx_it_if_needed();
 
         if (esp8266_uart_rx_pop(out) != 0) {
-#if ESP8266_DEBUG_UART_ENABLE
-#if ESP8266_DEBUG_UART_HEX_RX
-            if (!s_dbg_rx_line_open) {
-                esp8266_uart_debug_write_str("\r\n<< ");
-                s_dbg_rx_line_open = 1u;
-            }
-            esp8266_uart_debug_write_hex(*out);
-            if (*out == '\n') {
-                s_dbg_rx_line_open = 0u;
-            }
-#else
-            esp8266_uart_debug_write_byte(*out);
-#endif
-#endif
             return 1;
         }
 

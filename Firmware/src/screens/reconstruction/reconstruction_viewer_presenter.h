@@ -49,6 +49,12 @@ typedef struct {
     int has_recorded_data;
     int send_pending;
     char send_reply[256];
+
+    /* Live streaming state */
+    int streaming;         /**< 1 = streaming active                   */
+    int upload_pending;    /**< 1 = async TCP send in flight (drop frame) */
+    int stream_is_first;   /**< next frame to send is the reference frame */
+    uint32_t stream_json_len; /**< length of JSON built in SDRAM scratch  */
 } reconstruction_viewer_presenter_t;
 
 void reconstruction_viewer_presenter_init(reconstruction_viewer_presenter_t *presenter, reconstruction_viewer_view_t *view);
@@ -61,6 +67,7 @@ void reconstruction_viewer_presenter_on_send(void *ctx);
 void reconstruction_viewer_presenter_on_play_pause(void *ctx);
 void reconstruction_viewer_presenter_on_noise_toggle(void *ctx);
 void reconstruction_viewer_presenter_on_noise_level(void *ctx, int32_t level);
+void reconstruction_viewer_presenter_on_stream(void *ctx);
 void reconstruction_viewer_presenter_on_nav_home(void *ctx);
 void reconstruction_viewer_presenter_on_nav_eit(void *ctx);
 void reconstruction_viewer_presenter_on_nav_settings(void *ctx);

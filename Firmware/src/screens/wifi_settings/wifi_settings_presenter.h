@@ -12,6 +12,7 @@ typedef struct {
     wifi_settings_view_t *view;
     wifi_service_config_t pending_cfg;
     uint8_t connect_pending;
+    uint8_t scan_pending;
 } wifi_settings_presenter_t;
 
 void wifi_settings_presenter_init(wifi_settings_presenter_t *p, wifi_settings_view_t *v);
@@ -20,12 +21,11 @@ void wifi_settings_presenter_on_create(wifi_settings_presenter_t *p);
 void wifi_settings_presenter_on_back(void *ctx);
 void wifi_settings_presenter_on_save(void *ctx,
                                      const char *ssid,
-                                     const char *password,
-                                     const char *server);
+                                     const char *password);
 void wifi_settings_presenter_on_connect(void *ctx,
                                         const char *ssid,
-                                        const char *password,
-                                        const char *server);
+                                        const char *password);
+void wifi_settings_presenter_on_scan(void *ctx);
 void wifi_settings_presenter_on_nav_home(void *ctx);
 void wifi_settings_presenter_on_nav_eit(void *ctx);
 void wifi_settings_presenter_on_nav_settings(void *ctx);

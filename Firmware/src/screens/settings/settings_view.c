@@ -115,6 +115,13 @@ static void serial_monitor_clicked(lv_event_t *e)
         v->bindings.on_serial_monitor(v->bindings.ctx);
 }
 
+static void send_exam_clicked(lv_event_t *e)
+{
+    settings_view_t *v = (settings_view_t *)lv_event_get_user_data(e);
+    if (v && v->bindings.on_send_exam)
+        v->bindings.on_send_exam(v->bindings.ctx);
+}
+
 /* ---- Helper: section label ---- */
 static lv_obj_t *make_section_label(lv_obj_t *parent, const char *text,
                                     lv_align_t align, int x, int y)
@@ -158,7 +165,9 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     lv_obj_set_style_bg_color(view->content, lv_color_hex(COL_BG), 0);
     lv_obj_set_style_border_width(view->content, 0, 0);
     lv_obj_set_style_pad_all(view->content, 0, 0);
-    lv_obj_remove_flag(view->content, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_pad_bottom(view->content, 16, 0);
+    lv_obj_set_scroll_dir(view->content, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(view->content, LV_SCROLLBAR_MODE_AUTO);
 
     /* Title */
     view->label_title = lv_label_create(view->content);
@@ -169,7 +178,7 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
 
     /* ---- Card area ---- */
     lv_obj_t *card = lv_obj_create(view->content);
-    lv_obj_set_size(card, left_menu_content_width() - 34, 454);
+    lv_obj_set_size(card, left_menu_content_width() - 34, LV_SIZE_CONTENT);
     lv_obj_align(card, LV_ALIGN_TOP_MID, 0, 54);
     lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
     lv_obj_set_style_border_color(card, lv_color_hex(COL_CARD_BORDER), 0);
@@ -182,6 +191,7 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_row(card, 12, 0);
+    lv_obj_add_flag(card, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
     lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 
     /* ---- Row 1: Algorithm ---- */
@@ -355,19 +365,47 @@ void settings_view_create(settings_view_t *view, lv_obj_t *parent,
     lv_obj_set_style_text_font(serial_lbl, &lv_font_montserrat_14, 0);
     lv_obj_center(serial_lbl);
 
-    /* Calibration status label */
-    view->label_calib_status = lv_label_create(view->content);
+    /* ---- Row 8: Send Exam ---- */
+    lv_obj_t *row8 = lv_obj_create(card);
+    lv_obj_set_size(row8, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_min_height(row8, 50, 0);
+    lv_obj_set_style_bg_opa(row8, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row8, 0, 0);
+    lv_obj_set_style_pad_all(row8, 0, 0);
+
+    make_section_label(row8, "Send Exam", LV_ALIGN_LEFT_MID, 0, 0);
+
+    view->btn_send_exam = lv_button_create(row8);
+    lv_obj_set_size(view->btn_send_exam, 270, 50);
+    lv_obj_align(view->btn_send_exam, LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_set_style_bg_color(view->btn_send_exam, lv_color_hex(COL_BTN), 0);
+    lv_obj_set_style_radius(view->btn_send_exam, 8, 0);
+    lv_obj_set_style_shadow_width(view->btn_send_exam, 0, 0);
+    lv_obj_set_style_shadow_color(view->btn_send_exam, lv_color_hex(0xcccccc), 0);
+    lv_obj_set_style_shadow_ofs_y(view->btn_send_exam, 0, 0);
+    lv_obj_add_event_cb(view->btn_send_exam, send_exam_clicked, LV_EVENT_CLICKED, view);
+
+    lv_obj_t *send_exam_lbl = lv_label_create(view->btn_send_exam);
+    lv_label_set_text(send_exam_lbl, LV_SYMBOL_UPLOAD "  SEND EXAM");
+    lv_obj_set_style_text_color(send_exam_lbl, lv_color_white(), 0);
+    lv_obj_set_style_text_font(send_exam_lbl, &lv_font_montserrat_14, 0);
+    lv_obj_center(send_exam_lbl);
+
+    /* Calibration status label - flex child of card so it follows the rows */
+    view->label_calib_status = lv_label_create(card);
     lv_label_set_text(view->label_calib_status, "");
+    lv_obj_set_width(view->label_calib_status, LV_PCT(100));
+    lv_obj_set_style_text_align(view->label_calib_status, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(view->label_calib_status, lv_color_hex(COL_ACCENT), 0);
     lv_obj_set_style_text_font(view->label_calib_status, &lv_font_montserrat_14, 0);
-    lv_obj_align(view->label_calib_status, LV_ALIGN_TOP_MID, 0, 516);
 
     /* Batch status label */
-    view->label_batch_status = lv_label_create(view->content);
+    view->label_batch_status = lv_label_create(card);
     lv_label_set_text(view->label_batch_status, "");
+    lv_obj_set_width(view->label_batch_status, LV_PCT(100));
+    lv_obj_set_style_text_align(view->label_batch_status, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(view->label_batch_status, lv_color_hex(COL_ACCENT), 0);
     lv_obj_set_style_text_font(view->label_batch_status, &lv_font_montserrat_14, 0);
-    lv_obj_align(view->label_batch_status, LV_ALIGN_TOP_MID, 0, 494);
     view->btn_back = NULL;
 }
 
@@ -420,4 +458,13 @@ void settings_view_set_batch_enabled(settings_view_t *view, int enabled)
         lv_obj_clear_state(view->btn_batch, LV_STATE_DISABLED);
     else
         lv_obj_add_state(view->btn_batch, LV_STATE_DISABLED);
+}
+
+void settings_view_set_send_exam_enabled(settings_view_t *view, int enabled)
+{
+    if (!view || !view->btn_send_exam) return;
+    if (enabled)
+        lv_obj_clear_state(view->btn_send_exam, LV_STATE_DISABLED);
+    else
+        lv_obj_add_state(view->btn_send_exam, LV_STATE_DISABLED);
 }
