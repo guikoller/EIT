@@ -40,6 +40,16 @@
         "cwd": "${workspaceFolder}/Article"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "LaTeX: pdflatex artigo_cbis2026.tex",
+      "type": "shell",
+      "command": "pdflatex",
+      "args": ["-interaction=nonstopmode", "-halt-on-error", "artigo_cbis2026.tex"],
+      "options": {
+        "cwd": "${workspaceFolder}/Article"
+      },
+      "problemMatcher": []
     }
   ]
 }

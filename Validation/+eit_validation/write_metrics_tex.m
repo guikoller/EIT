@@ -19,41 +19,31 @@ function write_metrics_tex(tex_path, T_valid)
     fprintf(fid, '%% Ideal values: CC=1, SSIM=1, GRE=0, RMSE=0, PSNR=inf\n\n');
     fprintf(fid, '\\newcommand{\\NMatlabDatasets}{%d}\n\n', n);
 
-    % EIDORS metrics
+    % EIDORS metrics (Gauss-Newton + Tikhonov)
     fprintf(fid, '%% EIDORS (Gauss-Newton + Tikhonov)\n');
-    fprintf(fid, '\\newcommand{\\EidorsCCMean}{%.4f}\n', mean(T_valid.CC_E, 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsCCMin}{%.4f}\n', min(T_valid.CC_E, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsCCMax}{%.4f}\n', max(T_valid.CC_E, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsSSIMMean}{%.4f}\n', mean(T_valid.SSIM_E, 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsSSIMMin}{%.4f}\n', min(T_valid.SSIM_E, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsSSIMMax}{%.4f}\n', max(T_valid.SSIM_E, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsGREMean}{%.4f}\n', mean(T_valid.GRE_E, 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsGREMin}{%.4f}\n', min(T_valid.GRE_E, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsGREMax}{%.4f}\n', max(T_valid.GRE_E, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsRMSEMean}{%.4f}\n', mean(T_valid.RMSE_E, 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsRMSEMin}{%.4f}\n', min(T_valid.RMSE_E, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsRMSEMax}{%.4f}\n', max(T_valid.RMSE_E, [], 'omitnan'));
+    fprintf(fid, '\\newcommand{\\EidorsCCMean}{%.2f}\n',   mean(T_valid.CC_E,   'omitnan'));
+    fprintf(fid, '\\newcommand{\\EidorsCCSD}{%.2f}\n',     std(T_valid.CC_E,   0, 'omitnan'));
+    fprintf(fid, '\\newcommand{\\EidorsSSIMMean}{%.2f}\n', mean(T_valid.SSIM_E, 'omitnan'));
+    fprintf(fid, '\\newcommand{\\EidorsSSIMSD}{%.2f}\n',   std(T_valid.SSIM_E, 0, 'omitnan'));
+    fprintf(fid, '\\newcommand{\\EidorsGREMean}{%.2f}\n',  mean(T_valid.GRE_E,  'omitnan'));
+    fprintf(fid, '\\newcommand{\\EidorsGRESD}{%.2f}\n',    std(T_valid.GRE_E,  0, 'omitnan'));
+    fprintf(fid, '\\newcommand{\\EidorsRMSEMean}{%.2f}\n', mean(T_valid.RMSE_E, 'omitnan'));
+    fprintf(fid, '\\newcommand{\\EidorsRMSESD}{%.2f}\n',   std(T_valid.RMSE_E, 0, 'omitnan'));
     fprintf(fid, '\\newcommand{\\EidorsPSNRMean}{%.2f}\n', mean(T_valid.PSNR_E, 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsPSNRMin}{%.2f}\n', min(T_valid.PSNR_E, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\EidorsPSNRMax}{%.2f}\n\n', max(T_valid.PSNR_E, [], 'omitnan'));
+    fprintf(fid, '\\newcommand{\\EidorsPSNRSD}{%.2f}\n\n', std(T_valid.PSNR_E, 0, 'omitnan'));
 
-    % MATLAB metrics
+    % MATLAB LBP metrics
     fprintf(fid, '%% MATLAB LBP\n');
-    fprintf(fid, '\\newcommand{\\MatlabCCMean}{%.4f}\n', mean(T_valid.CC_M, 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabCCMin}{%.4f}\n', min(T_valid.CC_M, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabCCMax}{%.4f}\n', max(T_valid.CC_M, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabSSIMMean}{%.4f}\n', mean(T_valid.SSIM_M, 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabSSIMMin}{%.4f}\n', min(T_valid.SSIM_M, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabSSIMMax}{%.4f}\n', max(T_valid.SSIM_M, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabGREMean}{%.4f}\n', mean(T_valid.GRE_M, 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabGREMin}{%.4f}\n', min(T_valid.GRE_M, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabGREMax}{%.4f}\n', max(T_valid.GRE_M, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabRMSEMean}{%.4f}\n', mean(T_valid.RMSE_M, 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabRMSEMin}{%.4f}\n', min(T_valid.RMSE_M, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabRMSEMax}{%.4f}\n', max(T_valid.RMSE_M, [], 'omitnan'));
+    fprintf(fid, '\\newcommand{\\MatlabCCMean}{%.2f}\n',   mean(T_valid.CC_M,   'omitnan'));
+    fprintf(fid, '\\newcommand{\\MatlabCCSD}{%.2f}\n',     std(T_valid.CC_M,   0, 'omitnan'));
+    fprintf(fid, '\\newcommand{\\MatlabSSIMMean}{%.2f}\n', mean(T_valid.SSIM_M, 'omitnan'));
+    fprintf(fid, '\\newcommand{\\MatlabSSIMSD}{%.2f}\n',   std(T_valid.SSIM_M, 0, 'omitnan'));
+    fprintf(fid, '\\newcommand{\\MatlabGREMean}{%.2f}\n',  mean(T_valid.GRE_M,  'omitnan'));
+    fprintf(fid, '\\newcommand{\\MatlabGRESD}{%.2f}\n',    std(T_valid.GRE_M,  0, 'omitnan'));
+    fprintf(fid, '\\newcommand{\\MatlabRMSEMean}{%.2f}\n', mean(T_valid.RMSE_M, 'omitnan'));
+    fprintf(fid, '\\newcommand{\\MatlabRMSESD}{%.2f}\n',   std(T_valid.RMSE_M, 0, 'omitnan'));
     fprintf(fid, '\\newcommand{\\MatlabPSNRMean}{%.2f}\n', mean(T_valid.PSNR_M, 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabPSNRMin}{%.2f}\n', min(T_valid.PSNR_M, [], 'omitnan'));
-    fprintf(fid, '\\newcommand{\\MatlabPSNRMax}{%.2f}\n', max(T_valid.PSNR_M, [], 'omitnan'));
+    fprintf(fid, '\\newcommand{\\MatlabPSNRSD}{%.2f}\n',   std(T_valid.PSNR_M, 0, 'omitnan'));
 
     fclose(fid);
 end
