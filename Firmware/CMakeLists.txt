@@ -40,6 +40,7 @@ add_compile_options(
 include_directories(
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/inc
+    ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/HAL_Driver/Inc
     ${CMAKE_SOURCE_DIR}/CMSIS/device
     ${CMAKE_SOURCE_DIR}/CMSIS/core
@@ -79,12 +80,49 @@ add_definitions(
     -DSTM32F769I_DISCO
     -DDEBUG
     -DUSE_HAL_DRIVER
+    -DESP8266_USE_EN_PIN=1
 )
 
 # list of modules to build final firmware (without extension .c or .cpp)
 add_executable(${PROJECT_NAME}
     src/main.c
-    src/sd_file_browser.c
+    src/app/app_coordinator.c
+    src/app/app_fsm.c
+    src/assets/time_logo.c
+    src/services/storage_service.c
+    src/services/dataset_service.c
+    src/services/calibration.c
+    src/services/eit_acquisition.c
+    src/services/eit_acq_simulated.c
+    src/services/batch_process.c
+    src/services/json_encoder.c
+    src/services/wifi/esp8266_uart.c
+    src/services/wifi/esp8266_at.c
+    src/services/wifi/wifi_service.c
+    src/screens/common/left_menu.c
+    src/screens/home/home_screen.c
+    src/screens/home/home_view.c
+    src/screens/home/home_presenter.c
+    src/screens/settings/settings_screen.c
+    src/screens/settings/settings_view.c
+    src/screens/settings/settings_presenter.c
+    src/screens/wifi_settings/wifi_settings_screen.c
+    src/screens/wifi_settings/wifi_settings_view.c
+    src/screens/wifi_settings/wifi_settings_presenter.c
+    src/screens/serial_monitor/serial_monitor_screen.c
+    src/screens/serial_monitor/serial_monitor_view.c
+    src/screens/serial_monitor/serial_monitor_presenter.c
+    src/screens/browser/sd_file_browser.c
+    src/screens/browser/sd_file_browser_view.c
+    src/screens/browser/sd_file_browser_presenter.c
+    src/screens/data_viewer/data_viewer.c
+    src/screens/data_viewer/data_viewer_view.c
+    src/screens/data_viewer/data_viewer_presenter.c
+    src/screens/reconstruction/reconstruction_viewer.c
+    src/screens/reconstruction/reconstruction_viewer_view.c
+    src/screens/reconstruction/reconstruction_viewer_presenter.c
+    src/algorithms/eidors_mask_32.c
+    src/algorithms/lbp_reconstruction.c
     src/stm32f7xx_it.c
     src/syscalls.c
     src/system_stm32f7xx.c

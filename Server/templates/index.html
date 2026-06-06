@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EIT Live Dashboard</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card: #16213e;
+    --accent: #4a9fd8;
+    --green: #2e7d32;
+    --red: #c62828;
+    --text: #e0e0e0;
+    --text-sec: #888;
+    --border: #2a3a5a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  header h1 { font-size: 1.2rem; color: var(--accent); letter-spacing: 1px; }
+  .badge {
+    padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  .badge-waiting  { background: #333; color: var(--text-sec); }
+  .badge-streaming { background: var(--red); color: #fff; animation: pulse 1.2s infinite; }
+  .badge-exam     { background: #6a0dad; color: #fff; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.55; } }
+
+  main {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+    padding: 20px 28px;
+    max-width: 1200px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .card h2 { font-size: 0.85rem; color: var(--accent); letter-spacing: 1px;
+             text-transform: uppercase; margin-bottom: 14px; }
+
+  /* Heatmap panel */
+  #heatmap-card { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  #heatmap-canvas {
+    image-rendering: pixelated;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    width: 320px; height: 320px;
+  }
+  #colorbar { width: 320px; height: 16px; border-radius: 4px; }
+
+  /* Stats grid */
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { background: #0f1a2e; border-radius: 8px; padding: 12px; }
+  .stat .val { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+  .stat .lbl { font-size: 0.7rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+  /* Exam panel */
+  #exam-panel { display: none; }
+  #exam-panel.visible { display: block; }
+  .slider-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  #exam-slider { flex: 1; accent-color: var(--accent); }
+  #exam-frame-label { min-width: 60px; text-align: right; color: var(--text-sec); font-size: 0.85rem; }
+  #exam-canvas {
+    image-rendering: pixelated;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    width: 320px; height: 320px;
+    margin-top: 10px;
+  }
+
+  /* Log */
+  #log { height: 120px; overflow-y: auto; font-size: 0.75rem; color: var(--text-sec);
+          font-family: monospace; line-height: 1.6; }
+  #log p { border-bottom: 1px solid #1a2a3a; padding: 2px 0; }
+  #log p.ok  { color: #4caf50; }
+  #log p.err { color: #ef5350; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ EIT Live Dashboard</h1>
+  <span id="status-badge" class="badge badge-waiting">Waiting</span>
+  <span style="margin-left:auto; color:var(--text-sec); font-size:0.8rem;" id="conn-label">Connecting…</span>
+</header>
+
+<main>
+  <!-- Left column: live heatmap -->
+  <div>
+    <div class="card" id="heatmap-card">
+      <h2>Live Reconstruction</h2>
+      <canvas id="heatmap-canvas" width="32" height="32"></canvas>
+      <canvas id="colorbar" width="320" height="16"></canvas>
+    </div>
+
+    <!-- Exam replay -->
+    <div class="card" id="exam-panel" style="margin-top:16px;">
+      <h2>Exam Replay</h2>
+      <div class="slider-row">
+        <input type="range" id="exam-slider" min="0" max="0" value="0">
+        <span id="exam-frame-label">0 / 0</span>
+      </div>
+      <canvas id="exam-canvas" width="32" height="32"></canvas>
+    </div>
+  </div>
+
+  <!-- Right column: stats + log -->
+  <div style="display:flex; flex-direction:column; gap:16px;">
+    <div class="card">
+      <h2>Statistics</h2>
+      <div class="stats">
+        <div class="stat"><div class="val" id="stat-fps">--</div><div class="lbl">Display FPS</div></div>
+        <div class="stat"><div class="val" id="stat-frames">0</div><div class="lbl">Frames Received</div></div>
+        <div class="stat"><div class="val" id="stat-image-size">--</div><div class="lbl">Image Size</div></div>
+        <div class="stat"><div class="val" id="stat-exam-frames">--</div><div class="lbl">Exam Frames</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1;">
+      <h2>Event Log</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+</main>
+
+<script src="/static/main.js"></script>
+</body>
+</html>
